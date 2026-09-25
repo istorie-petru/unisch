@@ -1231,10 +1231,6 @@
     const parityTag = PARITY_TAGS[course.parity] || PARITY_TAGS.all;
     tr.appendChild(makeTagCell(parityTag.t, parityTag.key, "col-parity"));
 
-    // Parity color survives even when the Week column is hidden at narrow widths.
-    const stripeColor = course.parity === "odd" ? "var(--tag-orange-fg)" : course.parity === "even" ? "var(--tag-green-fg)" : "transparent";
-    enrolledTd.style.boxShadow = `inset 3px 0 0 ${stripeColor}`;
-
     const actionsTd = document.createElement("td");
     actionsTd.className = "actions";
     const editBtn = document.createElement("button");
