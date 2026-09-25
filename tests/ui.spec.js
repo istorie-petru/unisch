@@ -166,3 +166,40 @@ test("keyboard: rows open with Enter and the form traps Tab", async ({ page })=>
   await page.keyboard.press("Escape");
   await expect(row).toBeFocused();
 });
+
+// The white separator of an odd/even split block must lie exactly on the
+// corner-to-corner diagonal the two halves are cut along, whatever the
+// block's aspect ratio (1h/3h blocks, desktop and one-day phone widths).
+for(const [label, width, end] of [["1h desktop", 1200, "11:00"], ["3h desktop", 1200, "13:00"], ["2h phone", 375, "12:00"]]){
+  test(`odd/even separator follows the block's diagonal (${label})`, async ({ page })=>{
+    await page.setViewportSize({ width, height: 900 });
+    await openWith(page, appState({ courses: [
+      course({ id: "o", parity: "odd", start: "10:00", end }),
+      course({ id: "e", parity: "even", start: "10:00", end, type: "Seminar" })
+    ] }));
+    await page.getByRole("button", { name: "Calendar" }).click();
+    const block = page.locator(".diagonal-wrap");
+    const png = (await block.screenshot()).toString("base64");
+    const samples = await page.evaluate(async (data)=>{
+      const img = new Image(); img.src = "data:image/png;base64," + data; await img.decode();
+      const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+      const x = c.getContext("2d"); x.drawImage(img, 0, 0);
+      const W = img.width, H = img.height;
+      // Brightness at fraction t along the top-right -> bottom-left diagonal,
+      // shifted `off` px perpendicular to it.
+      const len = Math.hypot(W, H), nx = H / len, ny = W / len;
+      const at = (t, off)=>{
+        const px = Math.round(W * (1 - t) + nx * off), py = Math.round(H * t + ny * off);
+        const d = x.getImageData(px, py, 1, 1).data;
+        return (d[0] + d[1] + d[2]) / 3;
+      };
+      const ts = [0.2, 0.35, 0.5, 0.65, 0.8];
+      // A 2px line can straddle pixel boundaries: take the brightest pixel
+      // within ±2px of the diagonal. A drifting line would miss by far more.
+      const near = (t)=> Math.max(...[-2, -1, 0, 1, 2].map(o => at(t, o)));
+      return { on: ts.map(near), off: ts.flatMap(t => [at(t, -6), at(t, 6)]) };
+    }, png);
+    for(const v of samples.on) expect(v).toBeGreaterThan(250);  // white line
+    for(const v of samples.off) expect(v).toBeLessThan(248);    // tinted halves
+  });
+}
