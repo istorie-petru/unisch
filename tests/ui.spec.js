@@ -322,3 +322,26 @@ test("phones keep duplicate and delete in the row", async ({ page })=>{
   await expect(row.getByRole("button", { name: /^Delete/ })).toBeVisible();
   await expect(row.getByRole("button", { name: /^Edit/ })).toBeHidden();
 });
+
+test("odd/even split labels keep the normal font size and only abbreviate when needed", async ({ page })=>{
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await openWith(page, appState({ courses: COURSES }));
+  await page.getByRole("button", { name: "Calendar" }).click();
+  const info = await page.evaluate(()=>{
+    const normal = getComputedStyle(document.querySelector(".week-event:not(.diagonal-wrap) .we-name")).fontSize;
+    const wrap = document.querySelector(".diagonal-wrap").getBoundingClientRect();
+    const labels = [...document.querySelectorAll(".diagonal-wrap .we-tri-label")].map(l=>{
+      const r = l.getBoundingClientRect();
+      // Distance into the block from its own corner, as fractions.
+      const odd = l.classList.contains("tl");
+      const x = odd ? (r.right - wrap.left) / wrap.width : (wrap.right - r.left) / wrap.width;
+      const y = odd ? (r.bottom - wrap.top) / wrap.height : (wrap.bottom - r.top) / wrap.height;
+      return { text: l.textContent, size: getComputedStyle(l).fontSize, inside: x + y <= 1 };
+    });
+    return { normal, labels };
+  });
+  expect(info.labels.map(l => l.size)).toEqual([info.normal, info.normal]);
+  // "Programare orientată pe obiecte" is too long for its triangle; "Baze de date" fits.
+  expect(info.labels.map(l => l.text)).toEqual(["POO", "Baze de date"]);
+  expect(info.labels.every(l => l.inside)).toBe(true);
+});

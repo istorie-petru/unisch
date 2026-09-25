@@ -395,7 +395,8 @@
   .week-tri{position:absolute; inset:0;}
   .tri-a{clip-path:polygon(0 0,100% 0,0 100%);}
   .tri-b{clip-path:polygon(100% 0,100% 100%,0 100%);}
-  .we-tri-label{position:absolute; font-size:9px; font-weight:700; white-space:nowrap; max-width:calc(60% - 6px); overflow:hidden; text-overflow:ellipsis;}
+  /* Same size as other blocks' names; the max-width is set per block to the triangle's width at the label's row. */
+  .we-tri-label{position:absolute; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .we-tri-label.tl{top:3px; left:6px;}
   .we-tri-label.br{bottom:3px; right:6px;}
 
@@ -1905,6 +1906,14 @@
       onPress(tri, { accept: ()=> true, tap, start: ()=> ({ move(){}, end(){} }) });
       makeFocusable(tri, `${parity} week: ${eventLabel(course)}`, ()=> openEditModal(course));
     });
+    // Each label sits on a row 3px in from its corner. The triangle is
+    // narrower the further that row is from the corner, so the label may be
+    // as wide as the triangle at the row's inner edge (minus the 6px inset
+    // and a 3px gap to the diagonal). Only a name wider than that falls back
+    // to the acronym.
+    const rowInner = 3 + 10.5 * 1.3;
+    const pct = Math.max(20, 100 * (1 - rowInner / height));
+    [triOdd, triEven].forEach(t=>{ t.querySelector(".we-tri-label").style.maxWidth = `calc(${pct.toFixed(1)}% - 9px)`; });
     wrap.appendChild(triOdd);
     wrap.appendChild(triEven);
     col.appendChild(wrap);
