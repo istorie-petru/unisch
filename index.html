@@ -134,6 +134,12 @@
   .icon-btn:hover{background:var(--bg-secondary); color:var(--fg-primary);}
   .icon-btn:active{transform:scale(.92);}
   .icon-btn.danger:hover{background:var(--tag-red-bg); color:var(--danger);}
+  .icon-btn:disabled{opacity:.35; cursor:default; background:transparent; transform:none;}
+  .icon-btn:focus-visible, button.btn:focus-visible, .tab-btn:focus-visible, .seg-btn:focus-visible,
+  .menu-item:focus-visible, .add-row-btn:focus-visible, .empty-plus:focus-visible, .day-chip:focus-visible{
+    outline:2px solid var(--accent); outline-offset:2px;
+  }
+  tbody tr:focus-visible{outline:2px solid var(--accent); outline-offset:-2px;}
 
   /* Overflow menu */
   .menu-wrap{position:relative;}
@@ -286,11 +292,29 @@
   .field label{font-size:var(--text-caption); font-weight:600; color:var(--fg-secondary); text-transform:uppercase; letter-spacing:.02em;}
   .field input, .field select{background:var(--control-bg); border-color:var(--control-border); padding:8px 10px;}
   .field input:focus, .field select:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-subtle);}
+  .field-span2{grid-column:span 2;}
+  .field-hint{font-size:var(--text-caption); color:var(--fg-tertiary); line-height:1.4;}
   .section-title{font-size:var(--text-headline); font-weight:700; margin:22px 0 2px;}
   .section-title:first-child{margin-top:0;}
 
   /* Weekly calendar */
-  .week-grid{padding:8px 4px 10px;}
+  /* No text selection / iOS callout, so long-press can start a drag on touch. */
+  .week-grid{padding:8px 4px 10px; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;}
+  .week-body.day-view{touch-action:pan-y;}
+  .day-picker{display:flex; gap:4px; padding:0 0 8px;}
+  .day-chip{
+    flex:1; min-width:0; position:relative; border:none; background:var(--bg-secondary); color:var(--fg-secondary);
+    border-radius:var(--radius-sm); padding:8px 0 10px; font-size:var(--text-caption); font-weight:600;
+    text-transform:uppercase; letter-spacing:.03em; cursor:pointer;
+  }
+  .day-chip.active{background:var(--accent); color:var(--fg-on-accent);}
+  .day-chip.has-classes::after{
+    content:''; position:absolute; left:50%; bottom:3px; width:4px; height:4px; margin-left:-2px;
+    border-radius:50%; background:currentColor; opacity:.6;
+  }
+  .week-event:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+  .week-tri:focus-visible{outline:none;}
+  .week-event.diagonal-wrap:has(.week-tri:focus-visible){outline:2px solid var(--accent); outline-offset:1px;}
   .week-head{display:grid; grid-template-columns:52px repeat(7,1fr); padding-left:2px;}
   .week-head .wd{text-align:center; font-size:var(--text-caption); font-weight:600; color:var(--fg-tertiary); text-transform:uppercase; letter-spacing:.03em; padding:6px 2px;}
   .week-body{display:grid; grid-template-columns:52px repeat(7,1fr); position:relative;}
@@ -317,6 +341,7 @@
   .we-resize-handle{
     position:absolute; left:0; right:0; bottom:0; height:6px; cursor:ns-resize; z-index:3;
   }
+  @media (pointer:coarse){ .we-resize-handle{height:16px;} }
   .we-resize-handle::after{
     content:''; position:absolute; left:50%; bottom:2px; width:20px; height:2px; border-radius:1px;
     background:currentColor; opacity:.35; transform:translateX(-50%);
@@ -394,6 +419,7 @@
 
   @media (max-width:720px){
     .settings-grid{grid-template-columns:1fr 1fr;}
+    .field-span2{grid-column:1 / -1;}
     .field-grid{grid-template-columns:1fr;}
     .field-wide, .field-toggle{grid-column:span 1;}
   }
@@ -403,10 +429,11 @@
 
 <div class="app-window">
   <nav class="tabbar" id="tabs">
-    <button data-tab="classes" class="tab-btn active">Classes</button>
+    <button data-tab="classes" class="tab-btn active" aria-current="page">Classes</button>
     <button data-tab="holidays" class="tab-btn">Holidays</button>
     <button data-tab="settings" class="tab-btn">Settings</button>
     <div class="spacer"></div>
+    <button class="icon-btn" id="btnUndo" aria-label="Undo" title="Undo (Ctrl+Z)" disabled></button>
     <button class="icon-btn" id="btnTheme" aria-label="Toggle theme"></button>
   </nav>
 
@@ -428,7 +455,7 @@
         </div>
         <div class="spacer"></div>
         <div class="menu-wrap">
-          <button class="icon-btn" id="btnMore" aria-label="More options"></button>
+          <button class="icon-btn" id="btnMore" aria-label="More options" aria-haspopup="true" aria-expanded="false" aria-controls="moreMenu"></button>
           <div class="menu" id="moreMenu">
             <button class="menu-item" id="btnExportIcs">Export .ics</button>
             <button class="menu-item" id="btnExportVcf">Export contacts</button>
@@ -474,7 +501,7 @@
         <div class="week-grid" id="weekGrid"></div>
       </div>
 
-      <div class="warnings-strip" id="warningsStrip"></div>
+      <div class="warnings-strip" id="warningsStrip" aria-live="polite"></div>
     </section>
 
     <!-- HOLIDAYS -->
@@ -523,6 +550,11 @@
             <label for="creditsNeeded">Credits needed</label>
             <input type="number" id="creditsNeeded" min="0" step="1">
           </div>
+          <div class="field field-span2">
+            <label for="timeZone">Time zone</label>
+            <select id="timeZone" aria-describedby="timeZoneHint"></select>
+            <div class="field-hint" id="timeZoneHint">Pins exported classes to this zone, including its summer-time changes. "None" leaves times floating: each calendar app shows them in its own zone.</div>
+          </div>
         </div>
 
         <div class="section-title">Semester</div>
@@ -534,6 +566,15 @@
           <div class="field">
             <label for="semEnd">End</label>
             <input type="date" id="semEnd">
+          </div>
+          <div class="field field-span2">
+            <label for="parityMode">Odd / even weeks</label>
+            <select id="parityMode" aria-describedby="parityModeHint">
+              <option value="iso">ISO calendar week number</option>
+              <option value="semester">Week count from semester start</option>
+              <option value="semester-skip">Week count from semester start, skipping holiday weeks</option>
+            </select>
+            <div class="field-hint" id="parityModeHint">How your faculty numbers weeks. With a semester count, the week containing the start date is week 1 (odd). A holiday week is one whose Monday–Friday all fall inside Holidays ranges.</div>
           </div>
         </div>
       </div>
@@ -612,7 +653,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 (function(){
@@ -626,6 +667,7 @@
     sun: '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M12.5 3.5l-1.4 1.4M4.9 11.1l-1.4 1.4"/></svg>',
     moon: '<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M13.4 9.6A6 6 0 116.4 2.6a5 5 0 007 7z"/></svg>',
     warn: '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5l7 12.5H1z"/><path d="M8 6v3.2M8 11.4h.01"/></svg>',
+    undo: '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3L2.5 6l3 3"/><path d="M2.5 6h7a4 4 0 010 8H7"/></svg>',
     edit: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11.3 2.3a1.4 1.4 0 012 2L5 12.6l-3 .8.8-3z"/></svg>'
   };
 
@@ -670,9 +712,29 @@
       holidays: [],
       settings: {
         calName:"My University Schedule", reminderMinutes:"15",
-        creditsNeeded:"30", semStart:"", semEnd:""
+        creditsNeeded:"30", semStart:"", semEnd:"",
+        parityMode:"iso", timeZone:""
       }
     };
+  }
+
+  // Shared by storage load, backup import and undo: fills defaults and drops
+  // fields from older formats.
+  function normalizeState(parsed){
+    const merged = Object.assign(defaultState(), parsed, {
+      settings: Object.assign(defaultState().settings, parsed.settings || {})
+    });
+    if(!Array.isArray(merged.holidays)) merged.holidays = [];
+    merged.courses.forEach(c=>{
+      if(!c.id) c.id = uid();
+      if(c.enrolled === undefined) c.enrolled = true;
+      if(c.credits === undefined) c.credits = 0;
+      if(c.acronym === undefined) c.acronym = "";
+      if(!c.parity) c.parity = "all";
+      delete c.semester;
+    });
+    merged.holidays.forEach(h=>{ if(!h.id) h.id = uid(); });
+    return merged;
   }
 
   function loadState(){
@@ -702,24 +764,52 @@
         }
       }
       if(!parsed) return defaultState();
-      const merged = Object.assign(defaultState(), parsed, {
-        settings: Object.assign(defaultState().settings, parsed.settings || {})
-      });
-      merged.courses.forEach(c=>{
-        if(c.enrolled === undefined) c.enrolled = true;
-        if(c.credits === undefined) c.credits = 0;
-        if(c.acronym === undefined) c.acronym = "";
-        delete c.semester;
-      });
-      return merged;
+      return normalizeState(parsed);
     }catch(e){
       console.error("Failed to load state", e);
       return defaultState();
     }
   }
-  function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-
   let state = loadState();
+
+  // ---------- Universal undo ----------
+  // Every change goes through saveState(), so snapshotting there covers all
+  // of them — classes, holidays, settings, drags, imports. History lives in
+  // memory for the current visit.
+  const UNDO_LIMIT = 100;
+  const undoStack = [];
+  let savedSnapshot = JSON.stringify(state);
+  function saveState(){
+    const snap = JSON.stringify(state);
+    if(snap === savedSnapshot) return;
+    undoStack.push(savedSnapshot);
+    if(undoStack.length > UNDO_LIMIT) undoStack.shift();
+    savedSnapshot = snap;
+    localStorage.setItem(STORAGE_KEY, snap);
+    updateUndoButton();
+  }
+  function undo(){
+    if(!undoStack.length) return;
+    savedSnapshot = undoStack.pop();
+    state = normalizeState(JSON.parse(savedSnapshot));
+    localStorage.setItem(STORAGE_KEY, savedSnapshot);
+    window.__uniSchedule.state = state;
+    closeAddModal();
+    renderAll();
+    updateUndoButton();
+    toast("Undone");
+  }
+  const btnUndo = document.getElementById("btnUndo");
+  btnUndo.innerHTML = ICONS.undo;
+  btnUndo.addEventListener("click", undo);
+  function updateUndoButton(){ btnUndo.disabled = undoStack.length === 0; }
+  document.addEventListener("keydown", (e)=>{
+    if(!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
+    // Text fields keep their own native undo; the form is its own context.
+    if(e.target.closest("input, select, textarea") || modalOverlay.classList.contains("is-open")) return;
+    e.preventDefault();
+    undo();
+  });
 
   // ---------- Theme ----------
   const btnTheme = document.getElementById("btnTheme");
@@ -727,6 +817,7 @@
     if(t === "dark") document.documentElement.setAttribute("data-theme","dark");
     else document.documentElement.removeAttribute("data-theme");
     btnTheme.innerHTML = t === "dark" ? ICONS.sun : ICONS.moon;
+    btnTheme.setAttribute("aria-label", t === "dark" ? "Switch to light theme" : "Switch to dark theme");
     // Keep the mobile browser chrome the same color as the topbar (--bg-sidebar).
     document.querySelector('meta[name="theme-color"]').setAttribute("content", t === "dark" ? "#2b2b2d" : "#eff0f1");
   }
@@ -760,8 +851,9 @@
       thumb.style.transform = `translateX(${active.offsetLeft}px)`;
     }
     buttons.forEach(btn=>{
+      btn.setAttribute("aria-pressed", btn.classList.contains("active") ? "true" : "false");
       btn.addEventListener("click", ()=>{
-        buttons.forEach(b=>b.classList.toggle("active", b===btn));
+        buttons.forEach(b=>{ b.classList.toggle("active", b===btn); b.setAttribute("aria-pressed", b===btn ? "true" : "false"); });
         place();
         onChange(btn.dataset.value);
       });
@@ -788,7 +880,7 @@
   tabButtons.forEach(btn=>{
     btn.addEventListener("click", ()=>{
       currentTab = btn.dataset.tab;
-      tabButtons.forEach(b=>b.classList.toggle("active", b===btn));
+      tabButtons.forEach(b=>{ b.classList.toggle("active", b===btn); if(b===btn) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
       document.getElementById("view-classes").style.display = currentTab==="classes" ? "" : "none";
       document.getElementById("view-holidays").style.display = currentTab==="holidays" ? "" : "none";
       document.getElementById("view-settings").style.display = currentTab==="settings" ? "" : "none";
@@ -804,9 +896,20 @@
   const btnMore = document.getElementById("btnMore");
   const moreMenu = document.getElementById("moreMenu");
   btnMore.innerHTML = ICONS.more;
+  // The menu's open state is mirrored to aria-expanded; Escape closes it.
+  new MutationObserver(()=>{
+    const open = moreMenu.classList.contains("open");
+    btnMore.setAttribute("aria-expanded", open ? "true" : "false");
+    moreMenu.querySelectorAll(".menu-item").forEach(b=>{ b.tabIndex = open ? 0 : -1; });
+  }).observe(moreMenu, { attributes:true, attributeFilter:["class"] });
+  moreMenu.querySelectorAll(".menu-item").forEach(b=>{ b.tabIndex = -1; });
   btnMore.addEventListener("click", (e)=>{
     e.stopPropagation();
     moreMenu.classList.toggle("open");
+    if(moreMenu.classList.contains("open")) moreMenu.querySelector(".menu-item").focus();
+  });
+  moreMenu.addEventListener("keydown", (e)=>{
+    if(e.key === "Escape"){ e.stopPropagation(); moreMenu.classList.remove("open"); btnMore.focus(); }
   });
   document.addEventListener("click", ()=> moreMenu.classList.remove("open"));
   moreMenu.addEventListener("click", (e)=> e.stopPropagation());
@@ -1024,14 +1127,17 @@
     const editBtn = document.createElement("button");
     editBtn.className = "icon-btn edit-btn";
     editBtn.title = "Edit";
+    editBtn.setAttribute("aria-label", `Edit ${course.name || "class"}`);
     editBtn.innerHTML = ICONS.edit;
     editBtn.addEventListener("click", (e)=>{ e.stopPropagation(); openEditModal(course); });
     const delBtn = document.createElement("button");
     delBtn.className = "icon-btn danger";
     delBtn.title = "Delete";
+    delBtn.setAttribute("aria-label", `Delete ${course.name || "class"}`);
     delBtn.innerHTML = ICONS.x;
     delBtn.addEventListener("click", (e)=>{
       e.stopPropagation();
+      toast("Class deleted — Undo is in the top bar");
       tr.classList.add("row-anim-out");
       setTimeout(()=>{
         state.courses = state.courses.filter(c=>c.id !== course.id);
@@ -1048,6 +1154,12 @@
       if(e.target.closest("input, button")) return;
       openEditModal(course);
     });
+    tr.tabIndex = 0;
+    tr.setAttribute("aria-label", `${course.name || "Untitled"}, ${course.day} ${course.start}–${course.end}. Press Enter to edit.`);
+    tr.addEventListener("keydown", (e)=>{
+      if(e.target !== tr) return;
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openEditModal(course); }
+    });
     return tr;
   }
 
@@ -1058,6 +1170,7 @@
     input.type = "checkbox";
     input.checked = course.enrolled !== false;
     input.title = "Enrolled";
+    input.setAttribute("aria-label", `Enrolled in ${course.name || "class"}`);
     input.addEventListener("change", ()=>{
       course.enrolled = input.checked;
       saveState();
@@ -1132,6 +1245,7 @@
     const input = document.createElement("input");
     input.type = type;
     if(placeholder) input.placeholder = placeholder;
+    input.setAttribute("aria-label", { label:"Holiday label", start:"From", end:"To" }[field] || field);
     input.value = obj[field] || "";
     if(datalistOptions){
       const listId = "dl-" + field;
@@ -1181,6 +1295,7 @@
   let editingId = null;
 
   function openAddModal(prefill){
+    rememberModalOpener();
     editingId = null;
     modalTitleEl.textContent = "Add class";
     btnModalSave.textContent = "Add class";
@@ -1200,6 +1315,7 @@
   }
 
   function openEditModal(course){
+    rememberModalOpener();
     editingId = course.id;
     modalTitleEl.textContent = "Edit class";
     btnModalSave.textContent = "Save changes";
@@ -1218,10 +1334,32 @@
     setTimeout(()=> mName.focus(), 160);
   }
 
-  function closeAddModal(){ modalOverlay.classList.remove("is-open"); }
+  // Focus goes back to whatever opened the form (row, calendar block, button).
+  let modalReturnFocus = null;
+  function closeAddModal(){
+    if(!modalOverlay.classList.contains("is-open")) return;
+    modalOverlay.classList.remove("is-open");
+    if(modalReturnFocus && document.contains(modalReturnFocus)) modalReturnFocus.focus();
+    modalReturnFocus = null;
+  }
+  function rememberModalOpener(){
+    if(!modalOverlay.classList.contains("is-open")) modalReturnFocus = document.activeElement;
+  }
+  // Keep Tab inside the open form; Enter in a text field saves.
+  modalOverlay.addEventListener("keydown", (e)=>{
+    if(e.key === "Tab"){
+      const f = Array.from(modalOverlay.querySelectorAll("button, input, select")).filter(el=> !el.disabled && el.offsetParent !== null);
+      const firstEl = f[0], lastEl = f[f.length - 1];
+      if(e.shiftKey && document.activeElement === firstEl){ e.preventDefault(); lastEl.focus(); }
+      else if(!e.shiftKey && document.activeElement === lastEl){ e.preventDefault(); firstEl.focus(); }
+    } else if(e.key === "Enter" && e.target.matches("input:not([type=checkbox])")){
+      e.preventDefault();
+      btnModalSave.click();
+    }
+  });
 
-  document.getElementById("btnEmptyAdd").addEventListener("click", openAddModal);
-  document.getElementById("btnNewClass").addEventListener("click", openAddModal);
+  document.getElementById("btnEmptyAdd").addEventListener("click", ()=> openAddModal());
+  document.getElementById("btnNewClass").addEventListener("click", ()=> openAddModal());
   document.getElementById("btnModalClose").addEventListener("click", closeAddModal);
   document.getElementById("btnModalCancel").addEventListener("click", closeAddModal);
   modalOverlay.addEventListener("click", (e)=>{ if(e.target === modalOverlay) closeAddModal(); });
@@ -1309,80 +1447,154 @@
   }
   function clampHour(h, min, max){ return Math.max(min, Math.min(h, max)); }
 
-  // True while the user has a mouse button held down inside the calendar
-  // (moving, resizing, or drawing a new class) — suppresses the idle hover
-  // preview everywhere so it doesn't show through underneath.
+  // True while a press is held inside the calendar (moving, resizing, or
+  // drawing a new class) — suppresses the idle hover preview and swipes.
   let calendarInteractionActive = false;
+
+  // ---- Pointer gestures (mouse, touch and pen) ----
+  // Mouse: dragging starts on press. Touch/pen: the page must stay scrollable,
+  // so a drag only starts after a long press without moving; a short tap is
+  // reported as a tap, and moving early is left to the browser as a scroll.
+  const LONG_PRESS_MS = 380, TAP_SLOP_PX = 8, DOUBLE_TAP_MS = 350;
+  function onPress(el, { accept, start, tap }){
+    el.addEventListener("pointerdown", (e)=>{
+      if(!e.isPrimary || !accept(e)) return;
+      e.stopPropagation();
+      if(e.pointerType === "mouse"){
+        if(e.button !== 0) return;
+        e.preventDefault();
+        runDrag(e);
+        return;
+      }
+      const id = e.pointerId, x0 = e.clientX, y0 = e.clientY;
+      const timer = setTimeout(()=>{ cleanup(); runDrag(e); }, LONG_PRESS_MS);
+      function onMovePre(ev){
+        if(ev.pointerId === id && Math.hypot(ev.clientX - x0, ev.clientY - y0) > TAP_SLOP_PX) cleanup();
+      }
+      function onUpPre(ev){
+        if(ev.pointerId !== id) return;
+        cleanup();
+        if(tap) tap(ev);
+      }
+      function cleanup(){
+        clearTimeout(timer);
+        document.removeEventListener("pointermove", onMovePre);
+        document.removeEventListener("pointerup", onUpPre);
+        document.removeEventListener("pointercancel", cleanup);
+      }
+      document.addEventListener("pointermove", onMovePre);
+      document.addEventListener("pointerup", onUpPre);
+      document.addEventListener("pointercancel", cleanup);
+    });
+
+    function runDrag(e){
+      const id = e.pointerId;
+      const session = start(e);
+      calendarInteractionActive = true;
+      if(e.pointerType !== "mouse" && navigator.vibrate) navigator.vibrate(12);
+      // Stop the page from scrolling under the finger for the rest of this drag.
+      const blockScroll = (ev)=> ev.preventDefault();
+      document.addEventListener("touchmove", blockScroll, { passive:false });
+      function onMove(ev){ if(ev.pointerId === id) session.move(ev); }
+      function onUp(ev){ if(ev.pointerId === id){ done(); session.end(ev, true); } }
+      function onCancel(ev){ if(ev.pointerId === id){ done(); session.end(ev, false); } }
+      function done(){
+        calendarInteractionActive = false;
+        document.removeEventListener("touchmove", blockScroll);
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onCancel);
+      }
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onCancel);
+    }
+  }
+
+  // Double-click (mouse) or double-tap (touch/pen) — returns the tap handler
+  // for onPress() so taps that belong to a drag are never counted.
+  function onDoubleActivate(el, fn){
+    el.addEventListener("dblclick", (e)=>{ e.stopPropagation(); fn(); });
+    let last = 0;
+    return (e)=>{
+      if(e.pointerType === "mouse") return; // mouse uses the native dblclick
+      if(e.timeStamp - last < DOUBLE_TAP_MS){ last = 0; fn(); }
+      else last = e.timeStamp;
+    };
+  }
+
+  // Keyboard: calendar blocks are focusable; Enter/Space opens the editor.
+  function makeFocusable(el, label, fn){
+    el.tabIndex = 0;
+    el.setAttribute("role", "button");
+    el.setAttribute("aria-label", label);
+    el.addEventListener("keydown", (e)=>{
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); e.stopPropagation(); fn(); }
+    });
+  }
+  function eventLabel(course){
+    return `${course.name || acronymFor(course)}, ${course.day} ${course.start}–${course.end}` +
+      (course.room ? `, room ${course.room}` : "") + ". Press Enter to edit.";
+  }
 
   // Move: press and drag a class to a different day/hour. It doesn't float
   // above the grid — the block itself relocates and snaps directly into the
   // target hour cell as you drag, and the target column highlights.
   function attachMove(el, course, dayCols, gridStartHour, totalHours){
-    // Double-click opens the editor. A click without movement never re-renders
-    // (see onUp below), so the element survives long enough to get the dblclick.
-    el.addEventListener("dblclick", (e)=>{
-      e.stopPropagation();
-      openEditModal(course);
-    });
-    el.addEventListener("mousedown", (e)=>{
-      if(e.button !== 0 || e.target.closest(".we-resize-handle")) return;
-      e.preventDefault();
-      e.stopPropagation();
-      calendarInteractionActive = true;
-
-      const origDay = course.day;
-      const durMin = minutesFrom(course.end) - minutesFrom(course.start);
-      const maxStartHour = Math.max(0, Math.floor((1440 - durMin) / 60));
-      let pendingDay = origDay, pendingHour = parseInt(course.start.split(":")[0], 10);
-
-      const origTop = el.style.top;
-      el.classList.add("dragging");
-
-      function colUnderX(clientX){
-        for(const d of DAYS){
-          const r = dayCols[d].getBoundingClientRect();
-          if(clientX >= r.left && clientX < r.right) return d;
-        }
-        return null;
-      }
-
-      function onMove(e2){
-        const targetDay = colUnderX(e2.clientX) || pendingDay;
-        const col = dayCols[targetDay];
-        const rect = col.getBoundingClientRect();
-        const offsetY = e2.clientY - rect.top;
-        const hour = clampHour(gridStartHour + Math.floor(offsetY / HOUR_PX), gridStartHour, maxStartHour);
-
-        if(el.parentElement !== col) col.appendChild(el);
-        el.style.top = ((hour - gridStartHour) * HOUR_PX) + "px";
-
-        Object.values(dayCols).forEach(c=> c.classList.remove("drop-hover"));
-        col.classList.add("drop-hover");
-
-        pendingDay = targetDay;
-        pendingHour = hour;
-      }
-      function onUp(){
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        el.classList.remove("dragging");
-        Object.values(dayCols).forEach(c=> c.classList.remove("drop-hover"));
-        calendarInteractionActive = false;
-
+    const tap = onDoubleActivate(el, ()=> openEditModal(course));
+    makeFocusable(el, eventLabel(course), ()=> openEditModal(course));
+    onPress(el, {
+      accept: (e)=> !e.target.closest(".we-resize-handle"),
+      tap,
+      start(){
+        const origDay = course.day;
+        const origTop = el.style.top;
+        const durMin = minutesFrom(course.end) - minutesFrom(course.start);
+        const maxStartHour = Math.max(0, Math.floor((1440 - durMin) / 60));
         const originalHour = parseInt(course.start.split(":")[0], 10);
-        if(pendingDay === origDay && pendingHour === originalHour){ el.style.top = origTop; return; } // never actually moved
+        let pendingDay = origDay, pendingHour = originalHour;
+        el.classList.add("dragging");
 
-        course.day = pendingDay;
-        course.start = minutesToHHMM(pendingHour * 60);
-        course.end = minutesToHHMM(pendingHour * 60 + durMin);
-        saveState();
-        renderCalendar();
-        renderCourses();
-        renderWarnings();
-        toast("Class moved");
+        function colUnderX(clientX){
+          for(const d of Object.keys(dayCols)){
+            const r = dayCols[d].getBoundingClientRect();
+            if(clientX >= r.left && clientX < r.right) return d;
+          }
+          return null;
+        }
+        return {
+          move(e2){
+            const targetDay = colUnderX(e2.clientX) || pendingDay;
+            const col = dayCols[targetDay];
+            const rect = col.getBoundingClientRect();
+            const hour = clampHour(gridStartHour + Math.floor((e2.clientY - rect.top) / HOUR_PX), gridStartHour, maxStartHour);
+            if(el.parentElement !== col) col.appendChild(el);
+            el.style.top = ((hour - gridStartHour) * HOUR_PX) + "px";
+            Object.values(dayCols).forEach(c=> c.classList.remove("drop-hover"));
+            col.classList.add("drop-hover");
+            pendingDay = targetDay;
+            pendingHour = hour;
+          },
+          end(e2, committed){
+            el.classList.remove("dragging");
+            Object.values(dayCols).forEach(c=> c.classList.remove("drop-hover"));
+            // A click without movement never re-renders, so the element
+            // survives long enough to receive the dblclick.
+            if(!committed || (pendingDay === origDay && pendingHour === originalHour)){
+              if(el.parentElement !== dayCols[origDay]) dayCols[origDay].appendChild(el);
+              el.style.top = origTop;
+              return;
+            }
+            course.day = pendingDay;
+            course.start = minutesToHHMM(pendingHour * 60);
+            course.end = minutesToHHMM(pendingHour * 60 + durMin);
+            saveState();
+            renderCalendar();
+            renderCourses();
+            toast("Class moved");
+          }
+        };
       }
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
     });
   }
 
@@ -1391,35 +1603,28 @@
   function attachResize(el, course){
     const handle = document.createElement("div");
     handle.className = "we-resize-handle";
-    handle.addEventListener("mousedown", (e)=>{
-      e.preventDefault();
-      e.stopPropagation();
-      calendarInteractionActive = true;
-      const startY = e.clientY;
-      const startHeight = el.offsetHeight;
-
-      function onMove(e2){
-        const deltaHours = Math.round((e2.clientY - startY) / HOUR_PX);
-        const newHeight = Math.max(HOUR_PX - 2, startHeight + deltaHours*HOUR_PX);
-        el.style.height = newHeight + "px";
+    onPress(handle, {
+      accept: ()=> true,
+      start(e){
+        const startY = e.clientY;
+        const startHeight = el.offsetHeight;
+        const deltaHours = (e2)=> Math.round((e2.clientY - startY) / HOUR_PX);
+        return {
+          move(e2){
+            el.style.height = Math.max(HOUR_PX - 2, startHeight + deltaHours(e2)*HOUR_PX) + "px";
+          },
+          end(e2, committed){
+            if(!committed || deltaHours(e2) === 0){ el.style.height = startHeight + "px"; return; }
+            const durMin = minutesFrom(course.end) - minutesFrom(course.start);
+            const newDurMin = Math.max(60, durMin + deltaHours(e2)*60);
+            course.end = minutesToHHMM(Math.min(24*60, minutesFrom(course.start) + newDurMin));
+            saveState();
+            renderCalendar();
+            renderCourses();
+            toast("Class resized");
+          }
+        };
       }
-      function onUp(e2){
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        calendarInteractionActive = false;
-        const deltaHours = Math.round((e2.clientY - startY) / HOUR_PX);
-        const durMin = minutesFrom(course.end) - minutesFrom(course.start);
-        let newDurMin = Math.max(60, durMin + deltaHours*60);
-        let newEndMin = Math.min(24*60, minutesFrom(course.start) + newDurMin);
-        course.end = minutesToHHMM(newEndMin);
-        saveState();
-        renderCalendar();
-        renderCourses();
-        renderWarnings();
-        toast("Class resized");
-      }
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
     });
     el.appendChild(handle);
   }
@@ -1513,13 +1718,29 @@
     setFitCandidates(triEven.querySelector(".we-tri-label"), [even.name || acronymFor(even), acronymFor(even)]);
 
     // Alternating odd/even pairs can't be dragged (moving one half cleanly
-    // out of a diagonal split needs the modal) — double-click a half to edit
-    // it. clip-path also clips hit-testing, so each half gets its own clicks.
-    triOdd.addEventListener("dblclick", ()=> openEditModal(odd));
-    triEven.addEventListener("dblclick", ()=> openEditModal(even));
+    // out of a diagonal split needs the modal) — double-click/tap a half to
+    // edit it. clip-path also clips hit-testing, so each half gets its own clicks.
+    [[triOdd, odd, "odd"], [triEven, even, "even"]].forEach(([tri, course, parity])=>{
+      const tap = onDoubleActivate(tri, ()=> openEditModal(course));
+      onPress(tri, { accept: ()=> true, tap, start: ()=> ({ move(){}, end(){} }) });
+      makeFocusable(tri, `${parity} week: ${eventLabel(course)}`, ()=> openEditModal(course));
+    });
     wrap.appendChild(triOdd);
     wrap.appendChild(triEven);
     col.appendChild(wrap);
+  }
+
+  // Phones get a one-day view (seven columns don't fit); pick the day from
+  // the chips above the grid or swipe left/right on the grid.
+  const dayViewMq = window.matchMedia("(max-width:560px)");
+  let calDay = "Monday";
+  if(dayViewMq.addEventListener) dayViewMq.addEventListener("change", ()=> renderCalendar());
+  else dayViewMq.addListener(()=> renderCalendar());
+
+  function shiftCalDay(delta){
+    const i = (DAYS.indexOf(calDay) + delta + DAYS.length) % DAYS.length;
+    calDay = DAYS[i];
+    renderCalendar();
   }
 
   function renderCalendar(){
@@ -1527,22 +1748,44 @@
     const list = visibleCourses().filter(c => c.enrolled !== false && c.day && c.start && c.end);
     const { start, end } = calendarBounds(list);
     const totalHours = end - start;
+    const dayView = dayViewMq.matches;
+    const days = dayView ? [calDay] : DAYS;
+    const columns = dayView ? "44px 1fr" : "52px repeat(7,1fr)";
     const gridEl = document.getElementById("weekGrid");
     gridEl.innerHTML = "";
 
-    const head = document.createElement("div");
-    head.className = "week-head";
-    head.appendChild(document.createElement("div"));
-    DAYS.forEach(d=>{
-      const wd = document.createElement("div");
-      wd.className = "wd";
-      wd.textContent = DAY_SHORT[d];
-      head.appendChild(wd);
-    });
-    gridEl.appendChild(head);
+    if(dayView){
+      const picker = document.createElement("div");
+      picker.className = "day-picker";
+      picker.setAttribute("role", "group");
+      picker.setAttribute("aria-label", "Day");
+      DAYS.forEach(d=>{
+        const btn = document.createElement("button");
+        btn.className = "day-chip" + (d === calDay ? " active" : "");
+        btn.textContent = DAY_SHORT[d];
+        btn.setAttribute("aria-pressed", d === calDay ? "true" : "false");
+        if(list.some(c=> c.day === d)) btn.classList.add("has-classes");
+        btn.addEventListener("click", ()=>{ calDay = d; renderCalendar(); });
+        picker.appendChild(btn);
+      });
+      gridEl.appendChild(picker);
+    } else {
+      const head = document.createElement("div");
+      head.className = "week-head";
+      head.style.gridTemplateColumns = columns;
+      head.appendChild(document.createElement("div"));
+      days.forEach(d=>{
+        const wd = document.createElement("div");
+        wd.className = "wd";
+        wd.textContent = DAY_SHORT[d];
+        head.appendChild(wd);
+      });
+      gridEl.appendChild(head);
+    }
 
     const body = document.createElement("div");
-    body.className = "week-body";
+    body.className = "week-body" + (dayView ? " day-view" : "");
+    body.style.gridTemplateColumns = columns;
     body.style.setProperty("--hr-h", HOUR_PX + "px");
 
     const gutter = document.createElement("div");
@@ -1559,7 +1802,7 @@
 
     const dayCols = {};
     const byDay = {};
-    DAYS.forEach(d=>{
+    days.forEach(d=>{
       const col = document.createElement("div");
       col.className = "week-col";
       col.style.height = (totalHours * HOUR_PX) + "px";
@@ -1584,57 +1827,68 @@
       function hideHoverGhost(){
         if(hoverGhost){ hoverGhost.remove(); hoverGhost = null; }
       }
-      col.addEventListener("mousemove", (e)=>{
-        if(calendarInteractionActive || e.target !== col){ hideHoverGhost(); return; }
+      col.addEventListener("pointermove", (e)=>{
+        if(e.pointerType !== "mouse" || calendarInteractionActive || e.target !== col){ hideHoverGhost(); return; }
         showHoverGhost(e.clientY);
       });
-      col.addEventListener("mouseleave", hideHoverGhost);
+      col.addEventListener("pointerleave", hideHoverGhost);
 
-      // Click-and-release (with or without dragging) on empty grid space adds
-      // a class there. A plain click makes a 1-hour slot; dragging up or down
-      // before releasing selects a longer range, snapped to the hour.
-      col.addEventListener("mousedown", (e)=>{
-        if(e.target !== col || e.button !== 0) return;
-        e.preventDefault();
-        hideHoverGhost();
-        calendarInteractionActive = true;
-        const rect = col.getBoundingClientRect();
-        const startHour = clampHour(start + Math.floor((e.clientY - rect.top) / HOUR_PX), start, end - 1);
-        let hoverHour = startHour;
+      const hourAt = (clientY)=> clampHour(start + Math.floor((clientY - col.getBoundingClientRect().top) / HOUR_PX), start, end - 1);
+      const openAt = (lo, hi)=> openAddModal({ day: d, start: minutesToHHMM(lo*60), end: minutesToHHMM(Math.min(hi,24)*60) });
 
-        const preview = document.createElement("div");
-        preview.className = "week-event create-preview";
-        col.appendChild(preview);
-
-        function paint(){
-          const lo = Math.min(startHour, hoverHour), hi = Math.max(startHour, hoverHour);
-          preview.style.top = ((lo - start) * HOUR_PX) + "px";
-          preview.style.height = ((hi - lo + 1) * HOUR_PX - 2) + "px";
-        }
-        paint();
-
-        function onMove(e2){
-          hoverHour = clampHour(start + Math.floor((e2.clientY - rect.top) / HOUR_PX), start, end - 1);
+      // Press-and-release (with or without dragging) on empty grid space adds
+      // a class there. A plain click/tap makes a 1-hour slot; dragging up or
+      // down before releasing (after a long press on touch) selects a longer
+      // range, snapped to the hour.
+      onPress(col, {
+        accept: (e)=> e.target === col,
+        tap: (e)=>{ const h = hourAt(e.clientY); openAt(h, h + 1); },
+        start(e){
+          hideHoverGhost();
+          const startHour = hourAt(e.clientY);
+          let hoverHour = startHour;
+          const preview = document.createElement("div");
+          preview.className = "week-event create-preview";
+          col.appendChild(preview);
+          function paint(){
+            const lo = Math.min(startHour, hoverHour), hi = Math.max(startHour, hoverHour);
+            preview.style.top = ((lo - start) * HOUR_PX) + "px";
+            preview.style.height = ((hi - lo + 1) * HOUR_PX - 2) + "px";
+          }
           paint();
+          return {
+            move(e2){ hoverHour = hourAt(e2.clientY); paint(); },
+            end(e2, committed){
+              preview.remove();
+              if(committed) openAt(Math.min(startHour, hoverHour), Math.max(startHour, hoverHour) + 1);
+            }
+          };
         }
-        function onUp(){
-          document.removeEventListener("mousemove", onMove);
-          document.removeEventListener("mouseup", onUp);
-          preview.remove();
-          calendarInteractionActive = false;
-          const lo = Math.min(startHour, hoverHour), hi = Math.max(startHour, hoverHour) + 1;
-          openAddModal({ day: d, start: minutesToHHMM(lo*60), end: minutesToHHMM(Math.min(hi,24)*60) });
-        }
-        document.addEventListener("mousemove", onMove);
-        document.addEventListener("mouseup", onUp);
       });
 
       body.appendChild(col);
     });
 
+    // Swipe left/right to change day in the one-day view. touch-action:pan-y
+    // on the grid leaves horizontal moves to us; vertical ones still scroll.
+    if(dayView){
+      let sx = null, sy = 0, sid = null;
+      body.addEventListener("pointerdown", (e)=>{
+        if(e.pointerType === "mouse" || !e.isPrimary) return;
+        sx = e.clientX; sy = e.clientY; sid = e.pointerId;
+      }, true);
+      body.addEventListener("pointerup", (e)=>{
+        if(e.pointerId !== sid || sx === null) return;
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        sx = null;
+        if(calendarInteractionActive) return;
+        if(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftCalDay(dx < 0 ? 1 : -1);
+      }, true);
+    }
+
     list.forEach(c=>{ if(byDay[c.day]) byDay[c.day].push(c); });
 
-    DAYS.forEach(day=>{
+    days.forEach(day=>{
       const events = byDay[day].slice().sort((a,b)=> minutesFrom(a.start) - minutesFrom(b.start));
       const clusters = clusterOverlaps(events);
       clusters.forEach(cluster=>{
@@ -1651,6 +1905,9 @@
     gridEl.appendChild(body);
     fitLabels(gridEl);
   }
+
+  // Long-press on touch would otherwise open the context menu over the grid.
+  document.getElementById("weekGrid").addEventListener("contextmenu", (e)=> e.preventDefault());
 
   if("ResizeObserver" in window){
     const ro = new ResizeObserver(scheduleFitLabels);
@@ -1720,7 +1977,35 @@
   document.getElementById("btnEmptyAddHoliday").addEventListener("click", addHoliday);
 
   // ---------- Settings ----------
-  const settingsFields = ["calName","reminderMinutes","creditsNeeded","semStart","semEnd"];
+  const settingsFields = ["calName","reminderMinutes","creditsNeeded","semStart","semEnd","parityMode","timeZone"];
+
+  // Time zone list: IANA zones (they carry the summer-time rules a bare UTC
+  // offset can't), sorted and labelled by their standard UTC offset.
+  function populateTimeZones(){
+    const sel = document.getElementById("timeZone");
+    let zones = [];
+    try{ zones = Intl.supportedValuesOf("timeZone"); }catch(e){ /* older browser */ }
+    if(!zones.length) zones = ["UTC","Europe/London","Europe/Berlin","Europe/Bucharest","Europe/Chisinau","Europe/Istanbul","America/New_York","America/Los_Angeles","Asia/Tokyo"];
+    let here = "";
+    try{ here = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; }catch(e){ /* ignore */ }
+    const saved = state.settings.timeZone;
+    if(saved && !zones.includes(saved)) zones = zones.concat(saved);
+    const year = new Date().getFullYear();
+    const rows = zones.map(z=>{
+      let std = 0;
+      try{ std = Math.min(tzOffsetMinutes(z, Date.UTC(year,0,1)), tzOffsetMinutes(z, Date.UTC(year,6,1))); }catch(e){ /* unknown zone */ }
+      return { z, std };
+    }).sort((a,b)=> a.std - b.std || a.z.localeCompare(b.z));
+    const none = document.createElement("option");
+    none.value = ""; none.textContent = "None (floating time)";
+    sel.appendChild(none);
+    rows.forEach(({z, std})=>{
+      const opt = document.createElement("option");
+      opt.value = z;
+      opt.textContent = `(UTC${formatOffset(std, ":")}) ${z.replace(/_/g," ")}${z === here ? " — this device" : ""}`;
+      sel.appendChild(opt);
+    });
+  }
   function renderSettings(){
     settingsFields.forEach(f=>{
       document.getElementById(f).value = state.settings[f] || "";
@@ -1755,15 +2040,7 @@
       try{
         const parsed = JSON.parse(reader.result);
         if(!parsed.courses || !Array.isArray(parsed.courses)) throw new Error("Invalid file");
-        state = Object.assign(defaultState(), parsed, {
-          settings: Object.assign(defaultState().settings, parsed.settings || {})
-        });
-        state.courses.forEach(c=>{
-          if(c.enrolled === undefined) c.enrolled = true;
-          if(c.credits === undefined) c.credits = 0;
-          if(c.semester === undefined) c.semester = "sem1";
-          if(c.acronym === undefined) c.acronym = "";
-        });
+        state = normalizeState(parsed);
         saveState();
         renderAll();
         toast("Backup imported");
@@ -1853,6 +2130,102 @@
     return { start, end };
   }
 
+  // ---------- Week parity ----------
+  // Returns date -> "odd" | "even" for the semester, per the Settings mode:
+  //  - iso:           ISO-8601 week number. Not strictly alternating: a
+  //                   53-week year puts week 53 and week 1 (both odd) back to back.
+  //  - semester:      week 1 = the week (Mon–Sun) containing the semester start.
+  //  - semester-skip: same, but holiday weeks (Mon–Fri all inside Holidays
+  //                   ranges) aren't counted; classes don't happen in them anyway.
+  function mondayOf(date){
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+    return d;
+  }
+  function weeksBetween(a, b){
+    const ua = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+    const ub = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+    return Math.round((ub - ua) / (7*86400000));
+  }
+  function makeWeekParity(mode, semStart, inHoliday){
+    if(mode === "semester" || mode === "semester-skip"){
+      const firstMonday = mondayOf(semStart);
+      const skipped = new Map(); // week index -> skipped weeks up to and including it
+      const isHolidayWeek = (monday)=> [0,1,2,3,4].every(i=> inHoliday(addDays(monday, i)));
+      return (date)=>{
+        const idx = weeksBetween(firstMonday, mondayOf(date));
+        let n = idx + 1;
+        if(mode === "semester-skip"){
+          if(!skipped.has(idx)){
+            let count = 0;
+            for(let i=0;i<=idx;i++){ if(isHolidayWeek(addDays(firstMonday, 7*i))) count++; }
+            skipped.set(idx, count);
+          }
+          n -= skipped.get(idx);
+        }
+        return n % 2 === 1 ? "odd" : "even";
+      };
+    }
+    return (date)=> isOddIsoWeek(date) ? "odd" : "even";
+  }
+
+  // ---------- Time zones ----------
+  const tzFormatters = new Map();
+  function tzOffsetMinutes(tz, utcMs){
+    if(!tzFormatters.has(tz)){
+      tzFormatters.set(tz, new Intl.DateTimeFormat("en-US", {
+        timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit"
+      }));
+    }
+    const p = {};
+    tzFormatters.get(tz).formatToParts(new Date(utcMs)).forEach(x=>{ p[x.type] = x.value; });
+    const wall = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
+    return Math.round((wall - Math.floor(utcMs / 1000) * 1000) / 60000);
+  }
+  function formatOffset(min, sep){
+    const sign = min < 0 ? "-" : "+", a = Math.abs(min);
+    return sign + String(Math.floor(a/60)).padStart(2,"0") + (sep || "") + String(a%60).padStart(2,"0");
+  }
+  function fmtUtcStamp(ms){
+    return new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  }
+  function fmtWall(ms){ return fmtUtcStamp(ms).replace("Z", ""); }
+
+  // VTIMEZONE for `tz` covering [from, to]: the zone's actual transitions in
+  // that range, found by sampling daily and bisecting to the minute. Explicit
+  // observances (no RRULE) are valid RFC 5545 and need no rule guessing.
+  function buildVtimezone(tz, from, to){
+    const DAY = 86400000, MIN = 60000;
+    const startMs = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate()) - 7*DAY;
+    const endMs = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate()) + 8*DAY;
+    const first = tzOffsetMinutes(tz, startMs);
+    const transitions = [];
+    let prev = first;
+    for(let t = startMs + DAY; t <= endMs; t += DAY){
+      const off = tzOffsetMinutes(tz, t);
+      if(off === prev) continue;
+      let lo = t - DAY, hi = t;
+      while(hi - lo > MIN){
+        const mid = lo + Math.floor((hi - lo) / 2 / MIN) * MIN;
+        if(tzOffsetMinutes(tz, mid) === prev) lo = mid; else hi = mid;
+      }
+      transitions.push({ at: hi, from: prev, to: off });
+      prev = off;
+    }
+    const kind = (from, to)=> to > from ? "DAYLIGHT" : "STANDARD";
+    const initialKind = transitions.length && transitions[0].to < first ? "DAYLIGHT" : "STANDARD";
+    const lines = ["BEGIN:VTIMEZONE", `TZID:${tz}`];
+    const observance = (k, wallStart, from, to)=>{
+      lines.push(`BEGIN:${k}`, `DTSTART:${wallStart}`,
+        `TZOFFSETFROM:${formatOffset(from)}`, `TZOFFSETTO:${formatOffset(to)}`, `END:${k}`);
+    };
+    observance(initialKind, fmtWall(startMs + first*MIN), first, first);
+    transitions.forEach(tr=> observance(kind(tr.from, tr.to), fmtWall(tr.at + tr.from*MIN), tr.from, tr.to));
+    lines.push("END:VTIMEZONE");
+    return lines;
+  }
+
   function buildIcs(){
     const settings = state.settings;
     const bounds = semesterBounds(settings);
@@ -1860,6 +2233,7 @@
       throw new Error("Set the semester start and end dates in Settings first.");
     }
     const semStart = bounds.start, semEnd = bounds.end;
+    const tz = settings.timeZone || "";
 
     const holidayRanges = state.holidays
       .filter(h => h.start && h.end)
@@ -1868,11 +2242,12 @@
     function inHoliday(date){
       return holidayRanges.some(r => sameOrAfter(date, r.start) && sameOrBefore(date, r.end));
     }
+    const parityOf = makeWeekParity(settings.parityMode, semStart, inHoliday);
 
     const reminderMin = parseInt(settings.reminderMinutes, 10) || 0;
-
-    const now = new Date();
-    const dtstamp = combineDateTime(now, `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`);
+    // Local date-times: floating, or pinned to the chosen zone via TZID.
+    const tzParam = tz ? `;TZID=${tz}` : "";
+    const local = (date, hhmm)=> `${tzParam}:${combineDateTime(date, hhmm)}`;
 
     const lines = [];
     lines.push("BEGIN:VCALENDAR");
@@ -1880,46 +2255,56 @@
     lines.push("PRODID:-//uni-schedule-ics//EN");
     lines.push("CALSCALE:GREGORIAN");
     lines.push(`X-WR-CALNAME:${escapeIcsText(settings.calName || "University Schedule")}`);
+    if(tz){
+      lines.push(`X-WR-TIMEZONE:${tz}`);
+      buildVtimezone(tz, semStart, semEnd).forEach(l=> lines.push(l));
+    }
 
+    const dtstamp = fmtUtcStamp(Date.now()); // RFC 5545: DTSTAMP is always UTC
     const validCourses = state.courses.filter(c => c.enrolled !== false && c.day && c.start && c.end && c.name);
 
     validCourses.forEach(course=>{
+      // Every date this weekday falls on in the semester...
       const weekday = targetWeekdayIndex(course.day);
-      const interval = course.parity === "all" ? 1 : 2;
-
       let first = new Date(semStart);
-      while(first.getDay() !== weekday){
-        first = addDays(first, 1);
-      }
+      while(first.getDay() !== weekday) first = addDays(first, 1);
+      const weekly = [];
+      for(let d = first; d <= semEnd; d = addDays(d, 7)) weekly.push(d);
+
+      // ...narrowed to the weeks of the right parity.
+      const wanted = course.parity === "all" ? weekly : weekly.filter(d => parityOf(d) === course.parity);
+      if(!wanted.length) return;
+      const holidayDates = wanted.filter(inHoliday);
+      if(holidayDates.length === wanted.length) return;
+
+      // Series shape: strictly alternating weeks -> INTERVAL=2 (the clean
+      // "every 2 weeks" series calendar apps show); otherwise (ISO 53-week
+      // years, skipped holiday weeks) weekly with the off weeks excluded, so
+      // the export never drifts from the actual parity.
+      const firstW = wanted[0], lastW = wanted[wanted.length - 1];
+      const span = weekly.filter(d => d >= firstW && d <= lastW);
+      const wantedSet = new Set(wanted.map(d => d.getTime()));
+      let interval = 1, offWeeks = [];
       if(course.parity !== "all"){
-        while((course.parity === "odd") !== isOddIsoWeek(first)){
-          first = addDays(first, 7);
-        }
+        const alternating = span.every((d, i)=> (i % 2 === 0) === wantedSet.has(d.getTime()));
+        if(alternating) interval = 2;
+        else offWeeks = span.filter(d => !wantedSet.has(d.getTime()));
       }
-      if(first > semEnd) return;
+      const exdates = offWeeks.concat(holidayDates).sort((x, y)=> x - y);
 
-      const occurrences = [];
-      let cursor = new Date(first);
-      while(cursor <= semEnd){
-        occurrences.push(new Date(cursor));
-        cursor = addDays(cursor, 7*interval);
-      }
-      const exdates = occurrences.filter(inHoliday);
-      if(exdates.length === occurrences.length) return;
-
-      const untilDate = occurrences[occurrences.length - 1];
-      const until = combineDateTime(untilDate, course.end);
+      // UNTIL must be UTC when DTSTART has a TZID; the day after the last
+      // occurrence at 23:59:59Z covers it in any zone and can't reach the next one.
+      const until = tz ? `${fmtDate(addDays(lastW, 1))}T235959Z` : combineDateTime(lastW, course.end);
       const color = colorForType(course.type);
 
       lines.push("BEGIN:VEVENT");
       lines.push(`UID:${course.id}@uni-schedule-ics`);
       lines.push(`DTSTAMP:${dtstamp}`);
-      lines.push(`DTSTART:${combineDateTime(first, course.start)}`);
-      lines.push(`DTEND:${combineDateTime(first, course.end)}`);
+      lines.push(`DTSTART${local(firstW, course.start)}`);
+      lines.push(`DTEND${local(firstW, course.end)}`);
       lines.push(foldLine(`RRULE:FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${BYDAY[course.day]};UNTIL=${until}`));
       if(exdates.length){
-        const exdateStr = exdates.map(d => combineDateTime(d, course.start)).join(",");
-        lines.push(foldLine(`EXDATE:${exdateStr}`));
+        lines.push(foldLine(`EXDATE${tzParam}:${exdates.map(d => combineDateTime(d, course.start)).join(",")}`));
       }
       const label = course.acronym ? `${course.name} (${course.acronym})` : course.name;
       const summary = course.type ? `${label} — ${course.type}` : label;
@@ -2016,12 +2401,22 @@
     renderSettings();
     renderCalendar();
   }
+  populateTimeZones();
   renderAll();
 
   window.__uniSchedule = {
     state, buildIcs, buildVcf, isoWeekNumber, isOddIsoWeek, colorForType,
-    computeCreditsSummary, computeOverlaps, acronymFor
+    computeCreditsSummary, computeOverlaps, acronymFor, makeWeekParity,
+    buildVtimezone, tzOffsetMinutes, normalizeState, undo
   };
+
+  // Offline: a service worker caches the app shell (see sw.js). Service
+  // workers need http(s), so opening index.html straight from disk skips it.
+  if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+    window.addEventListener("load", ()=>{
+      navigator.serviceWorker.register("sw.js").catch(err=> console.warn("Offline mode unavailable:", err));
+    });
+  }
 })();
 </script>
 </body>
