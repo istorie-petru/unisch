@@ -135,10 +135,15 @@ shows on the next visit.
   consistent color, shown in the table and exported as the event
   `COLOR`/`CATEGORIES`, recognized by Google Calendar, Apple Calendar
   and Outlook.
-- **Date/time format**: the page is set to `lang="ro"`, so browsers
-  display native date/time pickers in the European `DD.MM.YYYY` / 24h
-  format rather than the US `MM/DD/YYYY` / AM-PM format. This depends
-  on browser support; the underlying data is unaffected either way.
+- **Date format**: dates are always shown and typed as `DD.MM.YYYY`,
+  whatever the browser's language — native date fields follow the
+  browser's locale (US English shows `MM/DD/YYYY`) and ignore the
+  page's language, so the app shows its own text field instead. Type
+  `28.09.2026`, `28/9/2026` or just `28092026` (dots are added as you
+  type, so a phone's number pad works), or use the calendar icon for
+  the browser's date picker. An impossible date (e.g. `31.02.2026`) is
+  rejected and the previous one kept. Stored and exported data is
+  unchanged.
 - **Keyboard**: table rows and calendar blocks are focusable (Tab);
   Enter opens the edit form, Escape closes it and returns focus, and
   Enter in a text field saves.

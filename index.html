@@ -293,6 +293,19 @@
   .field input, .field select{background:var(--control-bg); border-color:var(--control-border); padding:8px 10px;}
   .field input:focus, .field select:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-subtle);}
   .field-span2{grid-column:span 2;}
+  .date-field{position:relative; display:block;}
+  .date-field .date-text{padding-right:34px;}
+  .date-field .date-text.invalid{border-color:var(--danger); box-shadow:0 0 0 3px var(--tag-red-bg);}
+  /* Kept rendered (not display:none) so showPicker() can anchor the native calendar to the field. */
+  .date-field .date-native{
+    position:absolute; inset:0; width:100%; height:100%; opacity:0; pointer-events:none; padding:0; border:0;
+  }
+  .date-pick{
+    position:absolute; right:4px; top:50%; transform:translateY(-50%); width:26px; height:26px;
+    display:inline-flex; align-items:center; justify-content:center; background:none; border:none;
+    border-radius:var(--radius-sm); color:var(--fg-tertiary); cursor:pointer; padding:0;
+  }
+  .date-pick:hover{background:var(--bg-secondary); color:var(--fg-primary);}
   .field-hint{font-size:var(--text-caption); color:var(--fg-tertiary); line-height:1.4;}
   .section-title{font-size:var(--text-headline); font-weight:700; margin:22px 0 2px;}
   .section-title:first-child{margin-top:0;}
@@ -668,6 +681,7 @@
     moon: '<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M13.4 9.6A6 6 0 116.4 2.6a5 5 0 007 7z"/></svg>',
     warn: '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5l7 12.5H1z"/><path d="M8 6v3.2M8 11.4h.01"/></svg>',
     undo: '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3L2.5 6l3 3"/><path d="M2.5 6h7a4 4 0 010 8H7"/></svg>',
+    calendar: '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3"/></svg>',
     edit: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11.3 2.3a1.4 1.4 0 012 2L5 12.6l-3 .8.8-3z"/></svg>'
   };
 
@@ -984,6 +998,105 @@
     }
   }
 
+  // ---------- Date fields (DD.MM.YYYY) ----------
+  // Native <input type="date"> shows dates in the *browser's* locale (e.g.
+  // MM/DD/YYYY on an English browser) and ignores the page's lang. So each
+  // date input is kept, hidden, as the source of truth (ISO value + change
+  // events, so existing code keeps working) and a text field in front of it
+  // shows and accepts DD.MM.YYYY. The calendar icon still opens the native picker.
+  const DATE_HINT = "DD.MM.YYYY";
+  const nativeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  function isoToDmy(iso){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return m ? `${m[3]}.${m[2]}.${m[1]}` : "";
+  }
+  // Accepts D.M.YYYY with . / - or space as separators, or 8 digits (DDMMYYYY).
+  function dmyToIso(text){
+    const t = text.trim();
+    const m = /^(\d{1,2})[.\/\- ](\d{1,2})[.\/\- ](\d{4})$/.exec(t) || /^(\d{2})(\d{2})(\d{4})$/.exec(t);
+    if(!m) return null;
+    const d = +m[1], mo = +m[2], y = +m[3];
+    const dt = new Date(y, mo - 1, d);
+    if(dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null; // e.g. 31.02
+    return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  }
+  function enhanceDateInput(input){
+    const wrap = document.createElement("span");
+    wrap.className = "date-field";
+    input.parentNode.insertBefore(wrap, input);
+    const text = document.createElement("input");
+    text.type = "text";
+    text.className = "date-text";
+    text.placeholder = DATE_HINT;
+    text.maxLength = 10;
+    text.autocomplete = "off";
+    text.inputMode = "numeric"; // phone keypads have no dot; typed digits get dots added
+    text.setAttribute("aria-description", `Format ${DATE_HINT}`);
+    if(input.id){
+      text.id = input.id + "Text";
+      const label = document.querySelector(`label[for="${input.id}"]`);
+      if(label) label.htmlFor = text.id;
+    }
+    if(input.getAttribute("aria-label")){
+      text.setAttribute("aria-label", input.getAttribute("aria-label"));
+      input.removeAttribute("aria-label"); // only the visible field is labelled
+    }
+    const pick = document.createElement("button");
+    pick.type = "button";
+    pick.className = "date-pick";
+    pick.tabIndex = -1; // keyboard users type the date
+    pick.setAttribute("aria-hidden", "true");
+    pick.innerHTML = ICONS.calendar;
+    input.classList.add("date-native");
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    wrap.append(text, input, pick);
+
+    const sync = ()=>{ text.value = isoToDmy(nativeValue.get.call(input)); text.classList.remove("invalid"); };
+    // Programmatic `input.value = ...` (render functions) updates the text too.
+    Object.defineProperty(input, "value", {
+      configurable: true,
+      get(){ return nativeValue.get.call(input); },
+      set(v){ nativeValue.set.call(input, v); sync(); }
+    });
+    sync();
+
+    function commit(){
+      const raw = text.value.trim();
+      const iso = raw === "" ? "" : dmyToIso(raw);
+      if(iso === null){
+        text.classList.add("invalid");
+        return false;
+      }
+      text.classList.remove("invalid");
+      if(iso !== nativeValue.get.call(input)){
+        nativeValue.set.call(input, iso);
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      sync();
+      return true;
+    }
+    // Digits typed at the end get dots inserted (2809 -> 28.09), unless the
+    // user is typing their own separators (1.3.2026 is left alone).
+    text.addEventListener("input", ()=>{
+      const v = text.value;
+      if(text.selectionStart !== v.length || !/^(\d{2}\.){0,2}\d*$/.test(v)) return;
+      const dg = v.replace(/\D/g, "").slice(0, 8);
+      text.value = dg.slice(0,2) + (dg.length > 2 ? "." + dg.slice(2,4) : "") + (dg.length > 4 ? "." + dg.slice(4) : "");
+    });
+    text.addEventListener("keydown", (e)=>{ if(e.key === "Enter") commit(); });
+    text.addEventListener("blur", ()=>{
+      if(!commit()){
+        toast(`Use ${DATE_HINT}, e.g. 28.09.2026`);
+        sync(); // back to the last valid date
+      }
+    });
+    input.addEventListener("change", sync); // picked from the native calendar
+    pick.addEventListener("click", ()=>{
+      try{ input.showPicker(); }catch(e){ input.focus(); input.click(); }
+    });
+  }
+
   // ---------- Label fitting (full name vs. acronym) ----------
   // An element gets an ordered list of candidate labels, most descriptive
   // first; fitLabels() shows the first one that fits the element's current
@@ -1266,6 +1379,7 @@
       saveState();
     });
     td.appendChild(input);
+    if(type === "date") enhanceDateInput(input);
     return td;
   }
 
@@ -2006,6 +2120,8 @@
       sel.appendChild(opt);
     });
   }
+  enhanceDateInput(document.getElementById("semStart"));
+  enhanceDateInput(document.getElementById("semEnd"));
   function renderSettings(){
     settingsFields.forEach(f=>{
       document.getElementById(f).value = state.settings[f] || "";
