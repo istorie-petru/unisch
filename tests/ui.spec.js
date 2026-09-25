@@ -294,8 +294,8 @@ test.describe("odd/even layout", ()=>{
       course({ id: "w", name: "Weekly", day: "Wednesday", type: "Seminar" })
     ]);
     const bg = (name)=> page.getByRole("button", { name: new RegExp("^" + name) }).evaluate(el => el.style.background);
-    expect(await bg("Odd one")).toBe("var(--tag-yellow-bg)");
-    expect(await bg("Even one")).toBe("var(--tag-red-bg)");
+    expect(await bg("Odd one")).toBe("var(--tag-teal-bg)");
+    expect(await bg("Even one")).toBe("var(--tag-indigo-bg)");
     expect(await bg("Weekly")).toBe("var(--tag-gray-bg)");
   });
 

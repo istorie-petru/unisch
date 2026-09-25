@@ -31,6 +31,9 @@
     --tag-purple-fg:#8a5cb0; --tag-purple-bg:#f6f3f9;
     --tag-pink-fg:#c14c8a;   --tag-pink-bg:#faf1f5;
     --tag-red-fg:#d44c47;    --tag-red-bg:#fdebec;
+    /* Week parity: same OKLCH lightness and chroma, hue 195 vs 275. */
+    --tag-teal-fg:#017272;   --tag-teal-bg:#e2f5f4;
+    --tag-indigo-fg:#555f94; --tag-indigo-bg:#eceffe;
 
     --font-system:"Noto Sans","Segoe UI",Cantarell,Ubuntu,Roboto,"Helvetica Neue",Arial,sans-serif;
     --text-caption:11px;--text-footnote:12px;--text-body:13px;--text-callout:13.5px;
@@ -729,8 +732,8 @@
     return PALETTE[hash % PALETTE.length];
   }
 
-  // Calendar blocks are colored by week: yellow odd, red even, gray weekly.
-  const PARITY_COLOR = { all:"gray", odd:"yellow", even:"red" };
+  // Calendar blocks are colored by week: teal odd, indigo even, gray weekly.
+  const PARITY_COLOR = { all:"gray", odd:"teal", even:"indigo" };
   function colorForParity(parity){ return PARITY_COLOR[parity] || PARITY_COLOR.all; }
 
   function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
