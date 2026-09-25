@@ -124,6 +124,11 @@
   button.btn.primary:hover{background:var(--accent-hover);}
   button.btn.ghost{background:transparent; border-color:transparent;}
   button.btn.ghost:hover{background:var(--bg-secondary);}
+  button.btn.danger{color:var(--danger); border-color:var(--control-border);}
+  button.btn.danger:hover{background:var(--tag-red-bg);}
+  button.btn.danger.armed{background:var(--danger); border-color:var(--danger); color:#fff;}
+  .data-row{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:8px;}
+  .data-row .field-hint{flex:1; min-width:220px;}
   #btnNewClass{display:inline-flex; align-items:center; gap:6px;}
 
   .icon-btn{
@@ -589,6 +594,12 @@
             </select>
             <div class="field-hint" id="parityModeHint">How your faculty numbers weeks. With a semester count, the week containing the start date is week 1 (odd). A holiday week is one whose Monday–Friday all fall inside Holidays ranges.</div>
           </div>
+        </div>
+
+        <div class="section-title">Data</div>
+        <div class="data-row">
+          <button class="btn danger" id="btnWipe" aria-describedby="wipeHint">Delete all data</button>
+          <div class="field-hint" id="wipeHint">Removes every class, holiday and setting stored in this browser. This can't be undone — use ⋯ → Export backup first if you may need them.</div>
         </div>
       </div>
     </section>
@@ -2130,6 +2141,39 @@
       renderWarnings();
     });
   });
+
+  // ---------- Delete all local data ----------
+  // Two-step: the first click arms the button for a few seconds, the second
+  // wipes. Everything under the app's storage prefix goes (current and older
+  // formats, theme), and the undo history too — a privacy wipe must not be
+  // reversible from memory. The offline cache holds only the app's own files.
+  const btnWipe = document.getElementById("btnWipe");
+  let wipeTimer = null;
+  function disarmWipe(){
+    clearTimeout(wipeTimer);
+    btnWipe.classList.remove("armed");
+    btnWipe.textContent = "Delete all data";
+  }
+  btnWipe.addEventListener("click", ()=>{
+    if(!btnWipe.classList.contains("armed")){
+      btnWipe.classList.add("armed");
+      btnWipe.textContent = "Click again to delete everything";
+      wipeTimer = setTimeout(disarmWipe, 5000);
+      return;
+    }
+    disarmWipe();
+    Object.keys(localStorage).filter(k => k.startsWith("uniScheduleIcs.")).forEach(k => localStorage.removeItem(k));
+    state = defaultState();
+    window.__uniSchedule.state = state;
+    savedSnapshot = JSON.stringify(state);
+    undoStack.length = 0;
+    updateUndoButton();
+    theme = "light";
+    applyTheme(theme);
+    renderAll();
+    toast("All local data deleted");
+  });
+  btnWipe.addEventListener("blur", disarmWipe);
 
   // ---------- Backup export/import ----------
   document.getElementById("btnExportJson").addEventListener("click", ()=>{

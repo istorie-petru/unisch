@@ -42,6 +42,7 @@ file. They load it with **Import backup**.
 - **Undo** (the arrow in the top bar, or Ctrl/⌘+Z) steps back through every change made during this visit.
 - **Dates** are typed as `DD.MM.YYYY`. Typing just the digits (`28092026`) also works.
 - **Keyboard**: Tab reaches every class, Enter opens it and Escape closes it.
+- **Start over**: **Settings → Delete all data** removes everything the app stored in this browser. Click twice to confirm.
 
 ### Week counting
 

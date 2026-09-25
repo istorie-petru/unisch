@@ -49,3 +49,35 @@ test("undo covers settings and holidays too, step by step", async ({ page })=>{
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.locator("#calName")).toHaveValue("First");
 });
+
+test("delete all data wipes local storage after a confirming second click", async ({ page })=>{
+  await openWith(page, appState({ courses: [course({ id: "a" })], holidays: [{ id: "h", label: "Break", start: "2026-12-21", end: "2026-12-27" }] }));
+  await page.evaluate(()=>{ localStorage.setItem("uniScheduleIcs.theme", "dark"); localStorage.setItem("uniScheduleIcs.v2", "{}"); localStorage.setItem("other-app", "keep"); });
+  await page.getByRole("button", { name: "Holidays" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
+
+  const wipe = page.getByRole("button", { name: "Delete all data" });
+  await wipe.click(); // first click only arms it
+  await expect(page.getByRole("button", { name: "Click again to delete everything" })).toBeVisible();
+  expect((await stored(page)).courses).toHaveLength(1);
+
+  await page.getByRole("button", { name: "Click again to delete everything" }).click();
+  const keys = await page.evaluate(()=> Object.keys(localStorage));
+  expect(keys).toEqual(["other-app"]); // only the app's own keys are removed
+  await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", "dark");
+  await page.getByRole("button", { name: "Classes" }).click();
+  await expect(page.locator("#coursesBody tr[data-id]")).toHaveCount(0);
+
+  await page.reload(); // stays empty after reload
+  await expect(page.locator("#coursesEmpty")).toBeVisible();
+});
+
+test("the delete button disarms itself if not confirmed", async ({ page })=>{
+  await openWith(page, appState({ courses: [course({ id: "a" })] }));
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Delete all data" }).click();
+  await page.locator("#calName").click(); // focus moves away
+  await expect(page.getByRole("button", { name: "Delete all data" })).toBeVisible();
+  expect((await stored(page)).courses).toHaveLength(1);
+});
