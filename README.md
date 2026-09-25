@@ -9,7 +9,8 @@ device.
 ## Deploy on GitHub Pages (2 minutes)
 
 1. Create a new GitHub repository (public).
-2. Upload `index.html` to the repository root (drag-and-drop on
+2. Upload `index.html` (plus `favicon.ico`, `site.webmanifest` and the
+   `icons/` folder) to the repository root (drag-and-drop on
    github.com works, or `git add`, `git commit`, `git push`).
 3. Go to **Settings → Pages**.
 4. Under "Build and deployment", set **Source** to `Deploy from a
@@ -46,15 +47,25 @@ storage — nothing is shared between users, nothing is uploaded anywhere.
      it snaps directly into the target hour cell as you drag, rather
      than trailing a floating cursor ghost — or drag the handle at its
      bottom edge to resize it. Everything snaps to the hour.
+     Double-click a class (or either half of an odd/even split block)
+     to open it in the edit form.
+   - Course names adapt to the space available: the table shows
+     "Full name · ACR" when it fits, then just the full name, then just
+     the acronym; calendar blocks show the full name when it fits and
+     the acronym otherwise. Hover for the full name. This is plain
+     in-browser JavaScript, re-evaluated whenever the layout resizes.
+   - In the table, a divider line separates each day's classes.
    - A strip below the table/calendar appears only when something needs
      attention: enrolled credits that don't match what's needed, or
      enrolled classes that overlap in day/time. It's gone the moment
      both are fine.
    - On narrower windows (a half-width desktop split or a phone), lower
      priority columns (professor, room, credits, week, then type) are
-     hidden one by one rather than forcing horizontal scrolling —
-     everything's still one tap away in the edit form, and the week's
-     color still shows as a thin bar on the left of each row.
+     hidden one by one rather than forcing horizontal scrolling — the
+     freed space goes to the Course column. Everything's still one tap
+     away in the edit form (on phones the pencil icon is hidden too;
+     tap the row instead), and the week's color still shows as a thin
+     bar on the left of each row.
 3. **Holidays tab** — add date ranges (winter break, national
    holidays...). Any class occurrence inside a range is skipped in the
    export.
@@ -109,3 +120,8 @@ storage — nothing is shared between users, nothing is uploaded anywhere.
 
 - `index.html` — the entire app (HTML/CSS/JS, no external dependencies
   at all — system fonts only, no CDN calls).
+- `favicon.ico` (16/32/48 px), `icons/` (16/32 px PNG favicons, 180 px
+  `apple-touch-icon.png`, 192/512 px app icons and a 512 px maskable
+  icon) and `site.webmanifest` — the app icon set. All links use
+  relative paths, so they work under a GitHub Pages project URL.
+  Upload these alongside `index.html` when deploying.

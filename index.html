@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Uni Schedule → ICS</title>
+<!-- Relative paths so the icons resolve under a GitHub Pages project URL (/<repo>/) too. -->
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Uni Schedule">
+<meta name="theme-color" content="#eff0f1">
 <style>
   :root{
     --accent:#007aff;--accent-hover:#0071e3;--accent-active:#0062cc;--accent-subtle:rgba(0,122,255,.12);--accent-subtle-strong:rgba(0,122,255,.2);
@@ -184,13 +192,46 @@
   }
   .cell-type{display:flex; align-items:center; gap:6px; overflow:hidden;}
 
-  /* Column priority: hide lower-priority columns on narrower widths instead of horizontal scroll */
-  @media (max-width:900px){
-    .col-professor, .col-room, .col-credits, .col-parity{display:none;}
+  /* Column widths live on <col>s: compact columns are fixed-size and Course has
+     no width, so with table-layout:fixed it absorbs whatever is left.
+     Hiding a column = width:0 on its <col> plus .col-hidden on its cells. Not
+     display:none on the cells: a display:none cell gives up its grid slot, so
+     the cells after it shift under the wrong <col>, while the full-width rows
+     (colSpan=10) keep the empty column alive with no width — it then takes an
+     equal share of the leftover space and shows up as a gap at the row end. */
+  .cw-enrolled{width:34px;}
+  .cw-day{width:52px;}
+  .cw-time{width:100px;}
+  .cw-type{width:116px;}
+  .cw-professor{width:16%;}
+  .cw-room{width:10%;}
+  .cw-credits{width:68px;}
+  .cw-parity{width:76px;}
+  .cw-actions{width:72px;}
+  td.actions{white-space:nowrap;}
+
+  /* Column priority: hide lower-priority columns one by one on narrower widths instead of horizontal scroll */
+  @media (max-width:980px){ .cw-professor{width:0;} #tableCard .col-professor{padding:0; visibility:hidden;} }
+  @media (max-width:860px){ .cw-room{width:0;} #tableCard .col-room{padding:0; visibility:hidden;} }
+  @media (max-width:740px){ .cw-credits{width:0;} #tableCard .col-credits{padding:0; visibility:hidden;} }
+  @media (max-width:660px){ .cw-parity{width:0;} #tableCard .col-parity{padding:0; visibility:hidden;} }
+  @media (max-width:560px){
+    .cw-type{width:0;} #tableCard .col-type{padding:0; visibility:hidden;}
+    main{padding:14px 12px 18px;}
+    #tableCard{padding:4px 6px;}
+    /* Tapping a row already opens the editor — keep only delete to save width. */
+    #tableCard td.actions .edit-btn{display:none;}
+    .cw-actions{width:40px;}
   }
-  @media (max-width:600px){
-    .col-type{display:none;}
+
+  /* Divider between days in the classes table */
+  tbody tr.day-sep{border-bottom:none; cursor:default;}
+  tbody tr.day-sep:hover{background:none;}
+  tbody tr.day-sep td{
+    padding:0; height:9px;
+    background:linear-gradient(var(--border-strong),var(--border-strong)) center/100% 1px no-repeat;
   }
+  tbody tr.before-day-sep{border-bottom:none;}
 
   tbody input, tbody select, .field input, .field select{
     width:100%; border:1px solid transparent; background:transparent; padding:7px 8px;
@@ -201,8 +242,8 @@
     outline:none; border-color:var(--accent); background:var(--control-bg); box-shadow:0 0 0 3px var(--accent-subtle);
   }
   td.col-day select, td.col-parity select{cursor:pointer;}
-  td.actions{width:32px; text-align:center;}
-  td.col-enrolled{width:30px; text-align:center;}
+  td.actions{text-align:center;}
+  td.col-enrolled{text-align:center;}
   input[type="checkbox"]{width:16px; height:16px; accent-color:var(--accent); cursor:pointer;}
 
   .row-anim{opacity:0; transform:translateY(-4px);}
@@ -309,7 +350,7 @@
   .tri-b{clip-path:polygon(100% 0,100% 100%,0 100%);}
   .we-corner-dot{position:absolute; width:5px; height:5px; border-radius:50%; top:3px; left:3px;}
   .we-corner-dot.br{top:auto; left:auto; bottom:3px; right:3px;}
-  .we-tri-label{position:absolute; font-size:9px; font-weight:700; white-space:nowrap;}
+  .we-tri-label{position:absolute; font-size:9px; font-weight:700; white-space:nowrap; max-width:calc(60% - 10px); overflow:hidden; text-overflow:ellipsis;}
   .we-tri-label.tl{top:3px; left:10px;}
   .we-tri-label.br{bottom:3px; right:10px;}
 
@@ -402,18 +443,23 @@
       <div class="card" id="tableCard">
         <div class="table-scroll">
         <table>
+          <colgroup>
+            <col class="cw-enrolled"><col class="cw-day"><col class="cw-time"><col class="cw-course">
+            <col class="cw-type"><col class="cw-professor"><col class="cw-room"><col class="cw-credits">
+            <col class="cw-parity"><col class="cw-actions">
+          </colgroup>
           <thead>
             <tr>
-              <th class="col-enrolled" style="width:4%"></th>
-              <th class="col-day" style="width:9%">Day</th>
-              <th class="col-time" style="width:14%">Time</th>
-              <th class="col-course" style="width:27%">Course</th>
-              <th class="col-type" style="width:12%">Type</th>
-              <th class="col-professor" style="width:15%">Professor</th>
-              <th class="col-room" style="width:9%">Room</th>
-              <th class="col-credits" style="width:7%">Credits</th>
-              <th class="col-parity" style="width:10%">Week</th>
-              <th class="actions" style="width:9%"></th>
+              <th class="col-enrolled"></th>
+              <th class="col-day">Day</th>
+              <th class="col-time">Time</th>
+              <th class="col-course">Course</th>
+              <th class="col-type">Type</th>
+              <th class="col-professor">Professor</th>
+              <th class="col-room">Room</th>
+              <th class="col-credits">Credits</th>
+              <th class="col-parity">Week</th>
+              <th class="actions"></th>
             </tr>
           </thead>
           <tbody id="coursesBody"></tbody>
@@ -681,6 +727,8 @@
     if(t === "dark") document.documentElement.setAttribute("data-theme","dark");
     else document.documentElement.removeAttribute("data-theme");
     btnTheme.innerHTML = t === "dark" ? ICONS.sun : ICONS.moon;
+    // Keep the mobile browser chrome the same color as the topbar (--bg-sidebar).
+    document.querySelector('meta[name="theme-color"]').setAttribute("content", t === "dark" ? "#2b2b2d" : "#eff0f1");
   }
   let theme = localStorage.getItem(THEME_KEY) || "light";
   applyTheme(theme);
@@ -833,6 +881,44 @@
     }
   }
 
+  // ---------- Label fitting (full name vs. acronym) ----------
+  // An element gets an ordered list of candidate labels, most descriptive
+  // first; fitLabels() shows the first one that fits the element's current
+  // width without clipping, falling back to the last (shortest) one. Each
+  // candidate is a string or a list of [text, className] segments. Elements
+  // need a constrained width, nowrap and overflow:hidden for this to measure.
+  function setFitCandidates(el, candidates, fullTitle){
+    el._fitCandidates = candidates;
+    el.classList.add("fit-label");
+    if(fullTitle) el.title = fullTitle;
+    renderFitCandidate(el, candidates[0]);
+  }
+  function renderFitCandidate(el, candidate){
+    el.textContent = "";
+    if(typeof candidate === "string"){ el.textContent = candidate; return; }
+    candidate.forEach(([text, cls])=>{
+      const span = document.createElement("span");
+      if(cls) span.className = cls;
+      span.textContent = text;
+      el.appendChild(span);
+    });
+  }
+  function fitLabels(root){
+    (root || document).querySelectorAll(".fit-label").forEach(el=>{
+      const candidates = el._fitCandidates;
+      if(!candidates || el.clientWidth === 0) return; // hidden — the ResizeObserver refits once shown
+      for(let i=0;i<candidates.length;i++){
+        renderFitCandidate(el, candidates[i]);
+        if(el.scrollWidth <= el.clientWidth) return;
+      }
+    });
+  }
+  let fitFrame = 0;
+  function scheduleFitLabels(){
+    cancelAnimationFrame(fitFrame);
+    fitFrame = requestAnimationFrame(()=> fitLabels());
+  }
+
   // ---------- Courses table ----------
   const coursesBody = document.getElementById("coursesBody");
   const coursesEmpty = document.getElementById("coursesEmpty");
@@ -865,8 +951,21 @@
     table.style.display = "";
     coursesEmpty.style.display = "none";
 
+    let prevRow = null;
     list.forEach(course=>{
+      // Divider row whenever the day changes (the list is sorted by day, then time).
+      if(prevRow && prevRow.dataset.day !== course.day){
+        prevRow.classList.add("before-day-sep");
+        const sep = document.createElement("tr");
+        sep.className = "day-sep";
+        sep.setAttribute("aria-hidden", "true");
+        const sepTd = document.createElement("td");
+        sepTd.colSpan = 10;
+        sep.appendChild(sepTd);
+        coursesBody.appendChild(sep);
+      }
       const tr = buildCourseRow(course);
+      prevRow = tr;
       if(course.id === lastAddedId){
         tr.classList.add("row-anim");
         coursesBody.appendChild(tr);
@@ -889,6 +988,7 @@
     coursesBody.appendChild(addTr);
 
     renderWarnings();
+    fitLabels(coursesBody);
   }
 
   const PARITY_LABELS = { all:"Every week", odd:"Odd week", even:"Even week" };
@@ -900,6 +1000,7 @@
   function buildCourseRow(course){
     const tr = document.createElement("tr");
     tr.dataset.id = course.id;
+    tr.dataset.day = course.day || "";
     if(course.enrolled === false) tr.classList.add("row-disabled");
 
     const enrolledTd = makeCheckboxCell(course, tr);
@@ -921,7 +1022,7 @@
     const actionsTd = document.createElement("td");
     actionsTd.className = "actions";
     const editBtn = document.createElement("button");
-    editBtn.className = "icon-btn";
+    editBtn.className = "icon-btn edit-btn";
     editBtn.title = "Edit";
     editBtn.innerHTML = ICONS.edit;
     editBtn.addEventListener("click", (e)=>{ e.stopPropagation(); openEditModal(course); });
@@ -995,16 +1096,14 @@
     td.className = "col-course";
     const wrap = document.createElement("span");
     wrap.className = "cell-text";
-    const nameEl = document.createElement("span");
-    nameEl.className = "course-name";
-    nameEl.textContent = course.name || "Untitled";
-    wrap.appendChild(nameEl);
+    const name = course.name || "Untitled";
+    const candidates = [];
     if(course.acronym && course.acronym.trim()){
-      const acrEl = document.createElement("span");
-      acrEl.className = "course-acr";
-      acrEl.textContent = "· " + course.acronym.trim();
-      wrap.appendChild(acrEl);
+      candidates.push([[name, "course-name"], ["· " + course.acronym.trim(), "course-acr"]]);
     }
+    candidates.push([[name, "course-name"]]);
+    candidates.push([[acronymFor(course), "course-name"]]);
+    setFitCandidates(wrap, candidates, name);
     td.appendChild(wrap);
     return td;
   }
@@ -1219,6 +1318,12 @@
   // above the grid — the block itself relocates and snaps directly into the
   // target hour cell as you drag, and the target column highlights.
   function attachMove(el, course, dayCols, gridStartHour, totalHours){
+    // Double-click opens the editor. A click without movement never re-renders
+    // (see onUp below), so the element survives long enough to get the dblclick.
+    el.addEventListener("dblclick", (e)=>{
+      e.stopPropagation();
+      openEditModal(course);
+    });
     el.addEventListener("mousedown", (e)=>{
       if(e.button !== 0 || e.target.closest(".we-resize-handle")) return;
       e.preventDefault();
@@ -1230,6 +1335,7 @@
       const maxStartHour = Math.max(0, Math.floor((1440 - durMin) / 60));
       let pendingDay = origDay, pendingHour = parseInt(course.start.split(":")[0], 10);
 
+      const origTop = el.style.top;
       el.classList.add("dragging");
 
       function colUnderX(clientX){
@@ -1264,7 +1370,7 @@
         calendarInteractionActive = false;
 
         const originalHour = parseInt(course.start.split(":")[0], 10);
-        if(pendingDay === origDay && pendingHour === originalHour) return; // never actually moved
+        if(pendingDay === origDay && pendingHour === originalHour){ el.style.top = origTop; return; } // never actually moved
 
         course.day = pendingDay;
         course.start = minutesToHHMM(pendingHour * 60);
@@ -1332,7 +1438,7 @@
     ev.title = `${course.name}${course.room ? " · " + course.room : ""}`;
     const nameEl = document.createElement("span");
     nameEl.className = "we-name";
-    nameEl.textContent = acronymFor(course);
+    setFitCandidates(nameEl, [course.name || acronymFor(course), acronymFor(course)]);
     ev.appendChild(nameEl);
     if(course.room){
       const r = document.createElement("span");
@@ -1368,7 +1474,7 @@
       ev.appendChild(warn);
       const nameEl = document.createElement("span");
       nameEl.className = "we-name";
-      nameEl.textContent = acronymFor(course);
+      setFitCandidates(nameEl, [course.name || acronymFor(course), acronymFor(course)]);
       ev.appendChild(nameEl);
       attachMove(ev, course, dayCols, gridStart, totalHours);
       attachResize(ev, course);
@@ -1396,17 +1502,21 @@
     triOdd.className = "week-tri tri-a";
     triOdd.style.background = `var(--tag-${cOdd.key}-bg)`;
     triOdd.style.color = `var(--tag-${cOdd.key}-fg)`;
-    triOdd.innerHTML = `<span class="we-corner-dot" style="background:var(--tag-orange-fg)"></span><span class="we-tri-label tl">${acronymFor(odd)}</span>`;
+    triOdd.innerHTML = `<span class="we-corner-dot" style="background:var(--tag-orange-fg)"></span><span class="we-tri-label tl"></span>`;
+    setFitCandidates(triOdd.querySelector(".we-tri-label"), [odd.name || acronymFor(odd), acronymFor(odd)]);
 
     const triEven = document.createElement("div");
     triEven.className = "week-tri tri-b";
     triEven.style.background = `var(--tag-${cEven.key}-bg)`;
     triEven.style.color = `var(--tag-${cEven.key}-fg)`;
-    triEven.innerHTML = `<span class="we-corner-dot br" style="background:var(--tag-green-fg)"></span><span class="we-tri-label br">${acronymFor(even)}</span>`;
+    triEven.innerHTML = `<span class="we-corner-dot br" style="background:var(--tag-green-fg)"></span><span class="we-tri-label br"></span>`;
+    setFitCandidates(triEven.querySelector(".we-tri-label"), [even.name || acronymFor(even), acronymFor(even)]);
 
-    // Alternating odd/even pairs stay display-only here (moving one half
-    // cleanly out of a diagonal split needs the modal, not a drag) — edit
-    // them from the table instead.
+    // Alternating odd/even pairs can't be dragged (moving one half cleanly
+    // out of a diagonal split needs the modal) — double-click a half to edit
+    // it. clip-path also clips hit-testing, so each half gets its own clicks.
+    triOdd.addEventListener("dblclick", ()=> openEditModal(odd));
+    triEven.addEventListener("dblclick", ()=> openEditModal(even));
     wrap.appendChild(triOdd);
     wrap.appendChild(triEven);
     col.appendChild(wrap);
@@ -1539,6 +1649,15 @@
     });
 
     gridEl.appendChild(body);
+    fitLabels(gridEl);
+  }
+
+  if("ResizeObserver" in window){
+    const ro = new ResizeObserver(scheduleFitLabels);
+    ro.observe(document.getElementById("tableCard"));
+    ro.observe(document.getElementById("calendarCard"));
+  } else {
+    window.addEventListener("resize", scheduleFitLabels);
   }
 
   // ---------- Holidays table ----------
