@@ -55,3 +55,20 @@ test("holiday ranges use the same format", async ({ page })=>{
   await page.getByRole("textbox", { name: "To" }).press("Enter");
   expect((await stored(page)).holidays[0]).toMatchObject({ start: "2026-12-21", end: "2027-01-03" });
 });
+
+test("a date still being typed is saved before the .ics is exported", async ({ page })=>{
+  await openWith(page, appState({
+    courses: [{ id: "c", day: "Monday", start: "08:00", end: "10:00", name: "Algebra", parity: "all", enrolled: true }],
+    holidays: [{ id: "h", label: "Winter", start: "2026-12-21", end: "2026-12-27" }],
+    settings: { semStart: "2026-09-28", semEnd: "2027-01-31" }
+  }));
+  await page.getByRole("button", { name: "Holidays" }).click();
+  const to = page.getByRole("textbox", { name: "To" });
+  await to.fill("06.01.2027");
+  await expect(to).toBeFocused();
+  // A click that leaves focus in the field (as on some mobile browsers).
+  const download = page.waitForEvent("download");
+  await page.evaluate(()=> document.getElementById("btnExportIcs").click());
+  await download;
+  expect((await stored(page)).holidays[0].end).toBe("2027-01-06");
+});

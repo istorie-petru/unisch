@@ -59,6 +59,31 @@ test("semester mode without skipping keeps counting through holidays", async ({ 
   expect(plain.even).toContain("2026-12-28");    // week 14
 });
 
+test("a holiday crossing New Year removes every class inside it, in every browser zone", async ({ browser })=>{
+  const holidays = [{ id: "h", label: "Christmas", start: "2026-12-21", end: "2027-01-06" }];
+  for(const timezoneId of ["Europe/Bucharest", "America/New_York", "Pacific/Auckland"]){
+    const page = await (await browser.newContext({ timezoneId })).newPage();
+    for(const parityMode of ["iso", "semester", "semester-skip"]){
+      const got = expandIcs(await exportIcs(page, { parityMode }, holidays));
+      for(const d of got.odd.concat(got.even)) expect(d >= "2026-12-21" && d <= "2027-01-06", `${timezoneId} ${parityMode} ${d}`).toBe(false);
+      expect(got.odd.concat(got.even)).toContain("2027-01-11");
+    }
+    await page.context().close();
+  }
+});
+
+test("a holiday that ends before it starts blocks the export instead of being ignored", async ({ page })=>{
+  const holidays = [{ id: "h", label: "Christmas", start: "2026-12-21", end: "2026-01-03" }];
+  await openWith(page, appState({ courses: [ODD_MON], holidays, settings: SEMESTER }));
+  const err = await page.evaluate(()=>{ try{ window.__uniSchedule.buildIcs(); return ""; }catch(e){ return e.message; } });
+  expect(err).toContain('"Christmas" ends before it starts (21.12.2026 – 03.01.2026)');
+  await page.getByRole("button", { name: "Holidays" }).click();
+  await expect(page.locator("#holidaysBody tr").first()).toHaveClass(/range-invalid/);
+  await page.getByRole("textbox", { name: "To" }).fill("03.01.2027");
+  await page.getByRole("textbox", { name: "To" }).press("Enter");
+  await expect(page.locator("#holidaysBody tr").first()).not.toHaveClass(/range-invalid/);
+});
+
 test("DTSTAMP is UTC and times stay floating without a time zone", async ({ page })=>{
   const ics = await exportIcs(page, {});
   expect(ics).toMatch(/^DTSTAMP:\d{8}T\d{6}Z\r?$/m);

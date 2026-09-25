@@ -301,6 +301,7 @@
   .date-field{position:relative; display:block;}
   .date-field .date-text{padding-right:34px;}
   .date-field .date-text.invalid{border-color:var(--danger); box-shadow:0 0 0 3px var(--tag-red-bg);}
+  .range-invalid .date-field .date-text{border-color:var(--danger);}
   /* Kept rendered (not display:none) so showPicker() can anchor the native calendar to the field. */
   .date-field .date-native{
     position:absolute; inset:0; width:100%; height:100%; opacity:0; pointer-events:none; padding:0; border:0;
@@ -2058,6 +2059,15 @@
       tr.appendChild(makeInputCell(h, "label", "text", "e.g. Winter break"));
       tr.appendChild(makeInputCell(h, "start", "date"));
       tr.appendChild(makeInputCell(h, "end", "date"));
+      // A range that ends before it starts (e.g. 21.12.2026 – 03.01.2026, the
+      // old year kept by habit) matches no day at all, so flag it right away.
+      const checkRange = ()=>{
+        const bad = holidayRangeError(h) !== "";
+        tr.classList.toggle("range-invalid", bad);
+        tr.title = bad ? holidayRangeError(h) : "";
+      };
+      tr.addEventListener("change", checkRange);
+      checkRange();
       const actionsTd = document.createElement("td");
       actionsTd.className = "actions";
       const delBtn = document.createElement("button");
@@ -2088,6 +2098,15 @@
     addTd.appendChild(addBtn);
     addTr.appendChild(addTd);
     holidaysBody.appendChild(addTr);
+  }
+
+  // "" when the range is usable (or still empty), otherwise why it isn't.
+  function holidayRangeError(h){
+    if(!h.start && !h.end) return "";
+    const name = h.label ? `"${h.label}"` : "A holiday range";
+    if(!h.start || !h.end) return `${name} needs both a From and a To date.`;
+    if(h.end < h.start) return `${name} ends before it starts (${isoToDmy(h.start)} – ${isoToDmy(h.end)}). Check the year of the To date.`;
+    return "";
   }
 
   function addHoliday(){
@@ -2391,6 +2410,12 @@
     const semStart = bounds.start, semEnd = bounds.end;
     const tz = settings.timeZone || "";
 
+    // A half-filled or reversed range would be silently ignored and the
+    // classes in it exported anyway, so refuse instead.
+    const rangeErrors = state.holidays.map(holidayRangeError).filter(Boolean);
+    if(rangeErrors.length){
+      throw new Error(rangeErrors.join("\n") + "\nFix it in Holidays, then export again.");
+    }
     const holidayRanges = state.holidays
       .filter(h => h.start && h.end)
       .map(h => ({ start: parseDate(h.start), end: parseDate(h.end) }));
@@ -2484,6 +2509,9 @@
   }
 
   document.getElementById("btnExportIcs").addEventListener("click", ()=>{
+    // A date still being typed is only saved on blur; commit it first so it
+    // is in the file (some browsers don't move focus when a button is clicked).
+    if(document.activeElement && document.activeElement.classList.contains("date-text")) document.activeElement.blur();
     try{
       if(!state.courses.some(c=>c.enrolled !== false)){
         alert("Enroll in at least one class first.");
