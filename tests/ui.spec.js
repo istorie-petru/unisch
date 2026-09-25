@@ -220,25 +220,24 @@ test.describe("odd/even layout", ()=>{
     return {
       // Snapped to 5% so the 2–3px gaps between blocks don't matter.
       left: Math.round((r.left - x0) / w * 20) * 5, right: Math.round((r.right - x0) / w * 20) * 5,
-      top: parseFloat(el.style.top), conflict: el.classList.contains("conflict"),
-      badge: el.querySelector(".we-parity")?.textContent || ""
+      top: parseFloat(el.style.top), conflict: el.classList.contains("conflict")
     };
   });
 
-  test("a lone odd class takes the left half, a lone even one the right, with a badge", async ({ page })=>{
+  test("a lone odd class takes the left half, a lone even one the right", async ({ page })=>{
     await open(page, [
       course({ id: "o", name: "Odd one", parity: "odd" }),
       course({ id: "e", name: "Even one", parity: "even", day: "Tuesday" }),
       course({ id: "w", name: "Weekly", day: "Wednesday" })
     ]);
-    expect(await layout(page, "Odd one")).toMatchObject({ left: 0, right: 50, badge: "O", conflict: false });
-    expect(await layout(page, "Even one")).toMatchObject({ left: 50, right: 100, badge: "E" });
-    expect(await layout(page, "Weekly")).toMatchObject({ left: 0, right: 100, badge: "" });
+    expect(await layout(page, "Odd one")).toMatchObject({ left: 0, right: 50, conflict: false });
+    expect(await layout(page, "Even one")).toMatchObject({ left: 50, right: 100 });
+    expect(await layout(page, "Weekly")).toMatchObject({ left: 0, right: 100 });
   });
 
-  test("the Odd filter shows odd classes full width without the badge", async ({ page })=>{
+  test("the Odd filter shows odd classes full width", async ({ page })=>{
     await open(page, [course({ id: "o", name: "Odd one", parity: "odd" })], "Odd");
-    expect(await layout(page, "Odd one")).toMatchObject({ left: 0, right: 100, badge: "" });
+    expect(await layout(page, "Odd one")).toMatchObject({ left: 0, right: 100 });
   });
 
   test("an odd/even pair with different times sits side by side at its real times", async ({ page })=>{
@@ -283,8 +282,8 @@ test.describe("odd/even layout", ()=>{
       course({ id: "e", name: "Even one", parity: "even", start: "10:00", end: "12:00" })
     ]);
     expect(await layout(page, "Weekly")).toMatchObject({ conflict: true });
-    expect(await layout(page, "Odd one")).toMatchObject({ conflict: true, badge: "O" });
-    expect(await layout(page, "Even one")).toMatchObject({ conflict: false, badge: "E" });
+    expect(await layout(page, "Odd one")).toMatchObject({ conflict: true });
+    expect(await layout(page, "Even one")).toMatchObject({ conflict: false });
   });
 
   test("blocks are colored by week, whatever the class type", async ({ page })=>{
@@ -298,9 +297,28 @@ test.describe("odd/even layout", ()=>{
     expect(await bg("Even one")).toBe("var(--tag-indigo-bg)");
     expect(await bg("Weekly")).toBe("var(--tag-gray-bg)");
   });
+});
 
-  test("the diagonal split carries O/E badges", async ({ page })=>{
-    await open(page, COURSES);
-    await expect(page.locator(".diagonal-wrap .we-parity")).toHaveText(["O", "E"]);
-  });
+test("duplicate copies a class right after the original and can be undone", async ({ page })=>{
+  await openWith(page, appState({ courses: COURSES }));
+  await page.getByRole("button", { name: "Duplicate Programare orientată pe obiecte" }).click();
+  const courses = (await stored(page)).courses;
+  expect(courses).toHaveLength(COURSES.length + 1);
+  const [orig, copy] = [courses[1], courses[2]];
+  expect(copy.id).not.toBe(orig.id);
+  expect(Object.assign({}, copy, { id: orig.id })).toEqual(orig);
+  // Edit, duplicate, delete — in that order.
+  const labels = await page.locator("tr[data-id='poo'] td.actions button").evaluateAll(bs => bs.map(b => b.title));
+  expect(labels).toEqual(["Edit", "Duplicate", "Delete"]);
+  await page.getByRole("button", { name: "Undo" }).click();
+  expect((await stored(page)).courses).toHaveLength(COURSES.length);
+});
+
+test("phones keep duplicate and delete in the row", async ({ page })=>{
+  await page.setViewportSize({ width: 375, height: 700 });
+  await openWith(page, appState({ courses: COURSES }));
+  const row = page.locator("tr[data-id='poo']");
+  await expect(row.getByRole("button", { name: /^Duplicate/ })).toBeVisible();
+  await expect(row.getByRole("button", { name: /^Delete/ })).toBeVisible();
+  await expect(row.getByRole("button", { name: /^Edit/ })).toBeHidden();
 });

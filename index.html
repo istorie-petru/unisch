@@ -221,7 +221,7 @@
   .cw-room{width:10%;}
   .cw-credits{width:68px;}
   .cw-parity{width:76px;}
-  .cw-actions{width:72px;}
+  .cw-actions{width:100px;}
   td.actions{white-space:nowrap;}
 
   /* Column priority: hide lower-priority columns one by one on narrower widths instead of horizontal scroll */
@@ -233,9 +233,9 @@
     .cw-type{width:0;} #tableCard .col-type{padding:0; visibility:hidden;}
     main{padding:14px 12px 18px;}
     #tableCard{padding:4px 6px;}
-    /* Tapping a row already opens the editor — keep only delete to save width. */
+    /* Tapping a row already opens the editor — keep duplicate and delete to save width. */
     #tableCard td.actions .edit-btn{display:none;}
-    .cw-actions{width:40px;}
+    .cw-actions{width:70px;}
   }
 
   /* Divider between days in the classes table */
@@ -395,17 +395,9 @@
   .week-tri{position:absolute; inset:0;}
   .tri-a{clip-path:polygon(0 0,100% 0,0 100%);}
   .tri-b{clip-path:polygon(100% 0,100% 100%,0 100%);}
-  .we-tri-label{position:absolute; font-size:9px; font-weight:700; white-space:nowrap; max-width:calc(60% - 18px); overflow:hidden; text-overflow:ellipsis;}
-  .we-tri-label.tl{top:3px; left:18px;}
-  .we-tri-label.br{bottom:3px; right:18px;}
-  /* Odd/even marker: a letter on the page background, so it reads on any type color. */
-  .we-parity{
-    position:absolute; bottom:3px; right:3px; z-index:2; pointer-events:none;
-    min-width:11px; height:11px; padding:0 2px; box-sizing:border-box; border-radius:3px;
-    font-size:8px; font-weight:800; line-height:11px; text-align:center;
-    background:var(--bg-elevated); color:inherit; box-shadow:0 0 0 1px currentColor;
-  }
-  .we-parity.tl{bottom:auto; right:auto; top:3px; left:3px;}
+  .we-tri-label{position:absolute; font-size:9px; font-weight:700; white-space:nowrap; max-width:calc(60% - 6px); overflow:hidden; text-overflow:ellipsis;}
+  .we-tri-label.tl{top:3px; left:6px;}
+  .we-tri-label.br{bottom:3px; right:6px;}
 
   /* Modal */
   .modal-overlay{
@@ -703,6 +695,7 @@
     warn: '<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5l7 12.5H1z"/><path d="M8 6v3.2M8 11.4h.01"/></svg>',
     undo: '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3L2.5 6l3 3"/><path d="M2.5 6h7a4 4 0 010 8H7"/></svg>',
     calendar: '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3"/></svg>',
+    copy: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5v-.5A1.5 1.5 0 009 1.5H4A1.5 1.5 0 002.5 3v5A1.5 1.5 0 004 9.5h.5"/></svg>',
     edit: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11.3 2.3a1.4 1.4 0 012 2L5 12.6l-3 .8.8-3z"/></svg>'
   };
 
@@ -1179,6 +1172,17 @@
     return list;
   }
 
+  // An exact copy (new id) placed right after the original, e.g. to make the
+  // other week's lab from this one. It clashes with the original until edited.
+  function duplicateCourse(course){
+    const copy = Object.assign({}, course, { id: uid() });
+    state.courses.splice(state.courses.indexOf(course) + 1, 0, copy);
+    saveState();
+    renderCourses(copy.id);
+    renderCalendar();
+    toast("Class duplicated — Undo is in the top bar");
+  }
+
   function renderCourses(lastAddedId){
     const list = visibleCourses();
     coursesBody.innerHTML = "";
@@ -1264,6 +1268,12 @@
     editBtn.setAttribute("aria-label", `Edit ${course.name || "class"}`);
     editBtn.innerHTML = ICONS.edit;
     editBtn.addEventListener("click", (e)=>{ e.stopPropagation(); openEditModal(course); });
+    const dupBtn = document.createElement("button");
+    dupBtn.className = "icon-btn dup-btn";
+    dupBtn.title = "Duplicate";
+    dupBtn.setAttribute("aria-label", `Duplicate ${course.name || "class"}`);
+    dupBtn.innerHTML = ICONS.copy;
+    dupBtn.addEventListener("click", (e)=>{ e.stopPropagation(); duplicateCourse(course); });
     const delBtn = document.createElement("button");
     delBtn.className = "icon-btn danger";
     delBtn.title = "Delete";
@@ -1281,6 +1291,7 @@
       }, 150);
     });
     actionsTd.appendChild(editBtn);
+    actionsTd.appendChild(dupBtn);
     actionsTd.appendChild(delBtn);
     tr.appendChild(actionsTd);
 
@@ -1787,14 +1798,6 @@
     }));
     return ids;
   }
-  const PARITY_LETTER = { odd:"O", even:"E" };
-  function makeParityBadge(parity, corner){
-    const b = document.createElement("span");
-    b.className = "we-parity" + (corner ? " " + corner : "");
-    b.setAttribute("aria-hidden", "true");
-    b.textContent = PARITY_LETTER[parity];
-    return b;
-  }
 
   // One class block. leftPct/widthPct place it within the day column.
   function renderEventBox(col, course, gridStart, totalHours, dayCols, opts){
@@ -1829,7 +1832,6 @@
       r.textContent = course.room;
       ev.appendChild(r);
     }
-    if(opts.badge && PARITY_LETTER[course.parity]) ev.appendChild(makeParityBadge(course.parity));
     attachMove(ev, course, dayCols, gridStart, totalHours);
     attachResize(ev, course);
     col.appendChild(ev);
@@ -1853,7 +1855,7 @@
       const { lanes, count } = assignLanes(group);
       group.forEach((c, i)=> renderEventBox(col, c, gridStart, totalHours, dayCols, {
         leftPct: leftPct + lanes[i] * spanPct / count, widthPct: spanPct / count,
-        conflict: clashing.has(c.id), badge: allView
+        conflict: clashing.has(c.id)
       }));
     };
     if(allView && cluster.every(c => c.parity === "odd" || c.parity === "even")){
@@ -1886,7 +1888,6 @@
     triOdd.style.background = `var(--tag-${kOdd}-bg)`;
     triOdd.style.color = `var(--tag-${kOdd}-fg)`;
     triOdd.innerHTML = `<span class="we-tri-label tl"></span>`;
-    triOdd.appendChild(makeParityBadge("odd", "tl"));
     setFitCandidates(triOdd.querySelector(".we-tri-label"), [odd.name || acronymFor(odd), acronymFor(odd)]);
 
     const triEven = document.createElement("div");
@@ -1894,7 +1895,6 @@
     triEven.style.background = `var(--tag-${kEven}-bg)`;
     triEven.style.color = `var(--tag-${kEven}-fg)`;
     triEven.innerHTML = `<span class="we-tri-label br"></span>`;
-    triEven.appendChild(makeParityBadge("even"));
     setFitCandidates(triEven.querySelector(".we-tri-label"), [even.name || acronymFor(even), acronymFor(even)]);
 
     // Alternating odd/even pairs can't be dragged (moving one half cleanly
