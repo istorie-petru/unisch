@@ -203,3 +203,92 @@ for(const [label, width, end] of [["1h desktop", 1200, "11:00"], ["3h desktop", 
     for(const v of samples.off) expect(v).toBeLessThan(248);    // tinted halves
   });
 }
+
+// Odd/even classes in the All view: each week gets its own half of the day,
+// and only classes that really clash are marked as conflicts.
+test.describe("odd/even layout", ()=>{
+  const open = async (page, courses, filter)=>{
+    await page.setViewportSize({ width: 1200, height: 800 });
+    await openWith(page, appState({ courses }));
+    await page.getByRole("button", { name: "Calendar" }).click();
+    if(filter) await page.locator("#paritySeg").getByRole("button", { name: filter }).click();
+  };
+  // Block position as fractions of its day column, plus its state.
+  const layout = (page, name)=> page.getByRole("button", { name: new RegExp("^" + name) }).evaluate(el=>{
+    const col = el.closest(".week-col"), r = el.getBoundingClientRect(), c = col.getBoundingClientRect();
+    const x0 = c.left + col.clientLeft, w = col.clientWidth; // inside the column's border
+    return {
+      // Snapped to 5% so the 2–3px gaps between blocks don't matter.
+      left: Math.round((r.left - x0) / w * 20) * 5, right: Math.round((r.right - x0) / w * 20) * 5,
+      top: parseFloat(el.style.top), conflict: el.classList.contains("conflict"),
+      badge: el.querySelector(".we-parity")?.textContent || ""
+    };
+  });
+
+  test("a lone odd class takes the left half, a lone even one the right, with a badge", async ({ page })=>{
+    await open(page, [
+      course({ id: "o", name: "Odd one", parity: "odd" }),
+      course({ id: "e", name: "Even one", parity: "even", day: "Tuesday" }),
+      course({ id: "w", name: "Weekly", day: "Wednesday" })
+    ]);
+    expect(await layout(page, "Odd one")).toMatchObject({ left: 0, right: 50, badge: "O", conflict: false });
+    expect(await layout(page, "Even one")).toMatchObject({ left: 50, right: 100, badge: "E" });
+    expect(await layout(page, "Weekly")).toMatchObject({ left: 0, right: 100, badge: "" });
+  });
+
+  test("the Odd filter shows odd classes full width without the badge", async ({ page })=>{
+    await open(page, [course({ id: "o", name: "Odd one", parity: "odd" })], "Odd");
+    expect(await layout(page, "Odd one")).toMatchObject({ left: 0, right: 100, badge: "" });
+  });
+
+  test("an odd/even pair with different times sits side by side at its real times", async ({ page })=>{
+    await open(page, [
+      course({ id: "o", name: "Odd one", parity: "odd", start: "08:00", end: "10:00" }),
+      course({ id: "e", name: "Even one", parity: "even", start: "09:00", end: "11:00" })
+    ]);
+    await expect(page.locator(".diagonal-wrap")).toHaveCount(0);
+    const o = await layout(page, "Odd one"), e = await layout(page, "Even one");
+    expect(o).toMatchObject({ right: 50, conflict: false });
+    expect(e).toMatchObject({ left: 50, conflict: false });
+    expect(e.top - o.top).toBe(46); // one hour lower
+  });
+
+  test("a chain of odd/even classes is not a conflict", async ({ page })=>{
+    await open(page, [
+      course({ id: "a", name: "First odd", parity: "odd", start: "08:00", end: "10:00" }),
+      course({ id: "b", name: "Even between", parity: "even", start: "09:00", end: "11:00" }),
+      course({ id: "c", name: "Second odd", parity: "odd", start: "10:00", end: "12:00" })
+    ]);
+    await expect(page.locator(".week-event.conflict")).toHaveCount(0);
+    // The two odd classes don't overlap each other, so they share the whole odd half.
+    expect(await layout(page, "First odd")).toMatchObject({ left: 0, right: 50 });
+    expect(await layout(page, "Second odd")).toMatchObject({ left: 0, right: 50 });
+  });
+
+  test("only the classes that really clash are marked", async ({ page })=>{
+    await open(page, [
+      course({ id: "a", name: "Odd A", parity: "odd", start: "08:00", end: "10:00" }),
+      course({ id: "c", name: "Odd C", parity: "odd", start: "09:00", end: "11:00" }),
+      course({ id: "b", name: "Even B", parity: "even", start: "08:00", end: "10:00" })
+    ]);
+    expect(await layout(page, "Odd A")).toMatchObject({ left: 0, right: 25, conflict: true });
+    expect(await layout(page, "Odd C")).toMatchObject({ left: 25, right: 50, conflict: true });
+    expect(await layout(page, "Even B")).toMatchObject({ left: 50, right: 100, conflict: false });
+  });
+
+  test("a weekly class clashing with an odd one marks both, not the even one it can't meet", async ({ page })=>{
+    await open(page, [
+      course({ id: "w", name: "Weekly", start: "08:00", end: "09:30" }),
+      course({ id: "o", name: "Odd one", parity: "odd", start: "09:00", end: "11:00" }),
+      course({ id: "e", name: "Even one", parity: "even", start: "10:00", end: "12:00" })
+    ]);
+    expect(await layout(page, "Weekly")).toMatchObject({ conflict: true });
+    expect(await layout(page, "Odd one")).toMatchObject({ conflict: true, badge: "O" });
+    expect(await layout(page, "Even one")).toMatchObject({ conflict: false, badge: "E" });
+  });
+
+  test("the diagonal split carries O/E badges", async ({ page })=>{
+    await open(page, COURSES);
+    await expect(page.locator(".diagonal-wrap .we-parity")).toHaveText(["O", "E"]);
+  });
+});

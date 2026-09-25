@@ -392,11 +392,17 @@
   .week-tri{position:absolute; inset:0;}
   .tri-a{clip-path:polygon(0 0,100% 0,0 100%);}
   .tri-b{clip-path:polygon(100% 0,100% 100%,0 100%);}
-  .we-corner-dot{position:absolute; width:5px; height:5px; border-radius:50%; top:3px; left:3px;}
-  .we-corner-dot.br{top:auto; left:auto; bottom:3px; right:3px;}
-  .we-tri-label{position:absolute; font-size:9px; font-weight:700; white-space:nowrap; max-width:calc(60% - 10px); overflow:hidden; text-overflow:ellipsis;}
-  .we-tri-label.tl{top:3px; left:10px;}
-  .we-tri-label.br{bottom:3px; right:10px;}
+  .we-tri-label{position:absolute; font-size:9px; font-weight:700; white-space:nowrap; max-width:calc(60% - 18px); overflow:hidden; text-overflow:ellipsis;}
+  .we-tri-label.tl{top:3px; left:18px;}
+  .we-tri-label.br{bottom:3px; right:18px;}
+  /* Odd/even marker: a letter on the page background, so it reads on any type color. */
+  .we-parity{
+    position:absolute; bottom:3px; right:3px; z-index:2; pointer-events:none;
+    min-width:11px; height:11px; padding:0 2px; box-sizing:border-box; border-radius:3px;
+    font-size:8px; font-weight:800; line-height:11px; text-align:center;
+    background:var(--bg-elevated); color:inherit; box-shadow:0 0 0 1px currentColor;
+  }
+  .we-parity.tl{bottom:auto; right:auto; top:3px; left:3px;}
 
   /* Modal */
   .modal-overlay{
@@ -1656,6 +1662,7 @@
   }
   function eventLabel(course){
     return `${course.name || acronymFor(course)}, ${course.day} ${course.start}–${course.end}` +
+      (course.parity === "odd" || course.parity === "even" ? `, ${course.parity} weeks` : "") +
       (course.room ? `, room ${course.room}` : "") + ". Press Enter to edit.";
   }
 
@@ -1751,18 +1758,59 @@
     el.appendChild(handle);
   }
 
-  function renderSingleEvent(col, course, gridStart, totalHours, dayCols){
+  // Greedy lanes: each event takes the first lane that's free by its start,
+  // so a chain like 8–10 / 9–11 / 10–12 needs two lanes, not three.
+  function assignLanes(events){
+    const laneEnds = [];
+    const lanes = events.map(e=>{
+      const s = minutesFrom(e.start);
+      let i = laneEnds.findIndex(end => end <= s);
+      if(i < 0){ i = laneEnds.length; laneEnds.push(0); }
+      laneEnds[i] = minutesFrom(e.end);
+      return i;
+    });
+    return { lanes, count: laneEnds.length };
+  }
+  // Ids of the classes that really clash with another one in the cluster:
+  // an odd and an even class at the same time never meet, so they don't.
+  function clashingIds(cluster){
+    const ids = new Set();
+    cluster.forEach((a, i)=> cluster.slice(i + 1).forEach(b=>{
+      if(parityCompatible(a.parity, b.parity) && timeOverlap(a.start, a.end, b.start, b.end)){ ids.add(a.id); ids.add(b.id); }
+    }));
+    return ids;
+  }
+  const PARITY_LETTER = { odd:"O", even:"E" };
+  function makeParityBadge(parity, corner){
+    const b = document.createElement("span");
+    b.className = "we-parity" + (corner ? " " + corner : "");
+    b.setAttribute("aria-hidden", "true");
+    b.textContent = PARITY_LETTER[parity];
+    return b;
+  }
+
+  // One class block. leftPct/widthPct place it within the day column.
+  function renderEventBox(col, course, gridStart, totalHours, dayCols, opts){
     const { startMin, endMin } = posFor(course, gridStart);
     if(endMin <= 0 || startMin >= totalHours*60) return;
     const { top, height } = pxTopHeight(startMin, endMin);
     const color = colorForType(course.type);
+    const gap = opts.widthPct === 100 ? 3 : 2;
     const ev = document.createElement("div");
-    ev.className = "week-event";
-    ev.style.left = "3px"; ev.style.right = "3px";
+    ev.className = "week-event" + (opts.conflict ? " conflict" : "");
+    ev.style.left = `calc(${opts.leftPct}% + ${gap}px)`;
+    ev.style.width = `calc(${opts.widthPct}% - ${2*gap}px)`;
     ev.style.top = top + "px"; ev.style.height = height + "px";
     ev.style.background = `var(--tag-${color.key}-bg)`;
     ev.style.color = `var(--tag-${color.key}-fg)`;
-    ev.title = `${course.name}${course.room ? " · " + course.room : ""}`;
+    const weeks = course.parity === "odd" || course.parity === "even" ? ` · ${course.parity} weeks` : "";
+    ev.title = `${opts.conflict ? "Conflict: " : ""}${course.name}${course.room ? " · " + course.room : ""}${weeks}`;
+    if(opts.conflict){
+      const warn = document.createElement("span");
+      warn.className = "we-warn";
+      warn.innerHTML = ICONS.warn;
+      ev.appendChild(warn);
+    }
     const nameEl = document.createElement("span");
     nameEl.className = "we-name";
     setFitCandidates(nameEl, [course.name || acronymFor(course), acronymFor(course)]);
@@ -1773,40 +1821,39 @@
       r.textContent = course.room;
       ev.appendChild(r);
     }
+    if(opts.badge && PARITY_LETTER[course.parity]) ev.appendChild(makeParityBadge(course.parity));
     attachMove(ev, course, dayCols, gridStart, totalHours);
     attachResize(ev, course);
     col.appendChild(ev);
   }
 
-  function renderConflictGroup(col, cluster, gridStart, totalHours, dayCols){
-    const n = cluster.length;
-    cluster.forEach((course, idx)=>{
-      const { startMin, endMin } = posFor(course, gridStart);
-      if(endMin <= 0 || startMin >= totalHours*60) return;
-      const { top, height } = pxTopHeight(startMin, endMin);
-      const color = colorForType(course.type);
-      const widthPct = 100 / n;
-      const ev = document.createElement("div");
-      ev.className = "week-event conflict";
-      ev.style.left = `calc(${idx*widthPct}% + 2px)`;
-      ev.style.width = `calc(${widthPct}% - 4px)`;
-      ev.style.right = "auto";
-      ev.style.top = top + "px"; ev.style.height = height + "px";
-      ev.style.background = `var(--tag-${color.key}-bg)`;
-      ev.style.color = `var(--tag-${color.key}-fg)`;
-      ev.title = `Conflict: ${course.name}${course.room ? " · " + course.room : ""}`;
-      const warn = document.createElement("span");
-      warn.className = "we-warn";
-      warn.innerHTML = ICONS.warn;
-      ev.appendChild(warn);
-      const nameEl = document.createElement("span");
-      nameEl.className = "we-name";
-      setFitCandidates(nameEl, [course.name || acronymFor(course), acronymFor(course)]);
-      ev.appendChild(nameEl);
-      attachMove(ev, course, dayCols, gridStart, totalHours);
-      attachResize(ev, course);
-      col.appendChild(ev);
-    });
+  // A cluster is a run of classes connected by overlapping times. In the All
+  // view odd-only classes take the left half of the day and even-only ones
+  // the right half, each at its own times; an identical odd/even pair keeps
+  // the diagonal split. Anything with a weekly class in it shares the full
+  // width. Only classes that really clash get the conflict style.
+  function renderCluster(col, cluster, gridStart, totalHours, dayCols){
+    const allView = parityFilter === "all";
+    const [a, b] = cluster;
+    if(allView && cluster.length === 2 && isAlternatingPair(a, b) &&
+       minutesFrom(a.start) === minutesFrom(b.start) && minutesFrom(a.end) === minutesFrom(b.end)){
+      renderDiagonalPair(col, a, b, gridStart, totalHours, dayCols);
+      return;
+    }
+    const clashing = clashingIds(cluster);
+    const place = (group, leftPct, spanPct)=>{
+      const { lanes, count } = assignLanes(group);
+      group.forEach((c, i)=> renderEventBox(col, c, gridStart, totalHours, dayCols, {
+        leftPct: leftPct + lanes[i] * spanPct / count, widthPct: spanPct / count,
+        conflict: clashing.has(c.id), badge: allView
+      }));
+    };
+    if(allView && cluster.every(c => c.parity === "odd" || c.parity === "even")){
+      place(cluster.filter(c => c.parity === "odd"), 0, 50);
+      place(cluster.filter(c => c.parity === "even"), 50, 50);
+    } else {
+      place(cluster, 0, 100);
+    }
   }
 
   function renderDiagonalPair(col, a, b, gridStart, totalHours, dayCols){
@@ -1829,14 +1876,16 @@
     triOdd.className = "week-tri tri-a";
     triOdd.style.background = `var(--tag-${cOdd.key}-bg)`;
     triOdd.style.color = `var(--tag-${cOdd.key}-fg)`;
-    triOdd.innerHTML = `<span class="we-corner-dot" style="background:var(--tag-orange-fg)"></span><span class="we-tri-label tl"></span>`;
+    triOdd.innerHTML = `<span class="we-tri-label tl"></span>`;
+    triOdd.appendChild(makeParityBadge("odd", "tl"));
     setFitCandidates(triOdd.querySelector(".we-tri-label"), [odd.name || acronymFor(odd), acronymFor(odd)]);
 
     const triEven = document.createElement("div");
     triEven.className = "week-tri tri-b";
     triEven.style.background = `var(--tag-${cEven.key}-bg)`;
     triEven.style.color = `var(--tag-${cEven.key}-fg)`;
-    triEven.innerHTML = `<span class="we-corner-dot br" style="background:var(--tag-green-fg)"></span><span class="we-tri-label br"></span>`;
+    triEven.innerHTML = `<span class="we-tri-label br"></span>`;
+    triEven.appendChild(makeParityBadge("even"));
     setFitCandidates(triEven.querySelector(".we-tri-label"), [even.name || acronymFor(even), acronymFor(even)]);
 
     // Alternating odd/even pairs can't be dragged (moving one half cleanly
@@ -2014,13 +2063,7 @@
       const events = byDay[day].slice().sort((a,b)=> minutesFrom(a.start) - minutesFrom(b.start));
       const clusters = clusterOverlaps(events);
       clusters.forEach(cluster=>{
-        if(cluster.length === 1){
-          renderSingleEvent(dayCols[day], cluster[0], start, totalHours, dayCols);
-        } else if(cluster.length === 2 && parityFilter === "all" && isAlternatingPair(cluster[0], cluster[1])){
-          renderDiagonalPair(dayCols[day], cluster[0], cluster[1], start, totalHours, dayCols);
-        } else {
-          renderConflictGroup(dayCols[day], cluster, start, totalHours, dayCols);
-        }
+        renderCluster(dayCols[day], cluster, start, totalHours, dayCols);
       });
     });
 
