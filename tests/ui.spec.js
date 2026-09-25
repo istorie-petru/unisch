@@ -287,6 +287,18 @@ test.describe("odd/even layout", ()=>{
     expect(await layout(page, "Even one")).toMatchObject({ conflict: false, badge: "E" });
   });
 
+  test("blocks are colored by week, whatever the class type", async ({ page })=>{
+    await open(page, [
+      course({ id: "o", name: "Odd one", parity: "odd", type: "Seminar" }),
+      course({ id: "e", name: "Even one", parity: "even", day: "Tuesday", type: "Laboratory" }),
+      course({ id: "w", name: "Weekly", day: "Wednesday", type: "Seminar" })
+    ]);
+    const bg = (name)=> page.getByRole("button", { name: new RegExp("^" + name) }).evaluate(el => el.style.background);
+    expect(await bg("Odd one")).toBe("var(--tag-yellow-bg)");
+    expect(await bg("Even one")).toBe("var(--tag-red-bg)");
+    expect(await bg("Weekly")).toBe("var(--tag-gray-bg)");
+  });
+
   test("the diagonal split carries O/E badges", async ({ page })=>{
     await open(page, COURSES);
     await expect(page.locator(".diagonal-wrap .we-parity")).toHaveText(["O", "E"]);

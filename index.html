@@ -729,6 +729,10 @@
     return PALETTE[hash % PALETTE.length];
   }
 
+  // Calendar blocks are colored by week: yellow odd, red even, gray weekly.
+  const PARITY_COLOR = { all:"gray", odd:"yellow", even:"red" };
+  function colorForParity(parity){ return PARITY_COLOR[parity] || PARITY_COLOR.all; }
+
   function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
 
   function acronymFor(course){
@@ -1226,7 +1230,7 @@
   }
 
   const PARITY_LABELS = { all:"Every week", odd:"Odd week", even:"Even week" };
-  const PARITY_TAGS = { all:{t:"All", key:"gray"}, odd:{t:"Odd", key:"orange"}, even:{t:"Even", key:"green"} };
+  const PARITY_TAGS = { all:{t:"All", key:PARITY_COLOR.all}, odd:{t:"Odd", key:PARITY_COLOR.odd}, even:{t:"Even", key:PARITY_COLOR.even} };
 
   // Course rows are display-only (except the enrolled checkbox); every other
   // field is edited through the modal, which keeps the table compact enough
@@ -1794,17 +1798,18 @@
     const { startMin, endMin } = posFor(course, gridStart);
     if(endMin <= 0 || startMin >= totalHours*60) return;
     const { top, height } = pxTopHeight(startMin, endMin);
-    const color = colorForType(course.type);
+    const colorKey = colorForParity(course.parity);
     const gap = opts.widthPct === 100 ? 3 : 2;
     const ev = document.createElement("div");
     ev.className = "week-event" + (opts.conflict ? " conflict" : "");
     ev.style.left = `calc(${opts.leftPct}% + ${gap}px)`;
     ev.style.width = `calc(${opts.widthPct}% - ${2*gap}px)`;
     ev.style.top = top + "px"; ev.style.height = height + "px";
-    ev.style.background = `var(--tag-${color.key}-bg)`;
-    ev.style.color = `var(--tag-${color.key}-fg)`;
+    ev.style.background = `var(--tag-${colorKey}-bg)`;
+    ev.style.color = `var(--tag-${colorKey}-fg)`;
     const weeks = course.parity === "odd" || course.parity === "even" ? ` · ${course.parity} weeks` : "";
-    ev.title = `${opts.conflict ? "Conflict: " : ""}${course.name}${course.room ? " · " + course.room : ""}${weeks}`;
+    // The color shows the week now, so the type goes in the tooltip.
+    ev.title = `${opts.conflict ? "Conflict: " : ""}${course.name}${course.type ? " · " + course.type : ""}${course.room ? " · " + course.room : ""}${weeks}`;
     if(opts.conflict){
       const warn = document.createElement("span");
       warn.className = "we-warn";
@@ -1868,22 +1873,23 @@
     wrap.className = "week-event diagonal-wrap";
     wrap.style.left = "3px"; wrap.style.right = "3px";
     wrap.style.top = top + "px"; wrap.style.height = height + "px";
-    wrap.title = `${odd.name} (odd week) / ${even.name} (even week)`;
+    const typeOf = (c)=> c.type ? `, ${c.type}` : "";
+    wrap.title = `${odd.name}${typeOf(odd)} (odd week) / ${even.name}${typeOf(even)} (even week)`;
 
-    const cOdd = colorForType(odd.type), cEven = colorForType(even.type);
+    const kOdd = colorForParity("odd"), kEven = colorForParity("even");
 
     const triOdd = document.createElement("div");
     triOdd.className = "week-tri tri-a";
-    triOdd.style.background = `var(--tag-${cOdd.key}-bg)`;
-    triOdd.style.color = `var(--tag-${cOdd.key}-fg)`;
+    triOdd.style.background = `var(--tag-${kOdd}-bg)`;
+    triOdd.style.color = `var(--tag-${kOdd}-fg)`;
     triOdd.innerHTML = `<span class="we-tri-label tl"></span>`;
     triOdd.appendChild(makeParityBadge("odd", "tl"));
     setFitCandidates(triOdd.querySelector(".we-tri-label"), [odd.name || acronymFor(odd), acronymFor(odd)]);
 
     const triEven = document.createElement("div");
     triEven.className = "week-tri tri-b";
-    triEven.style.background = `var(--tag-${cEven.key}-bg)`;
-    triEven.style.color = `var(--tag-${cEven.key}-fg)`;
+    triEven.style.background = `var(--tag-${kEven}-bg)`;
+    triEven.style.color = `var(--tag-${kEven}-fg)`;
     triEven.innerHTML = `<span class="we-tri-label br"></span>`;
     triEven.appendChild(makeParityBadge("even"));
     setFitCandidates(triEven.querySelector(".we-tri-label"), [even.name || acronymFor(even), acronymFor(even)]);
