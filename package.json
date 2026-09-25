@@ -1,7 +1,7 @@
 {
   "name": "unisch",
   "private": true,
-  "description": "Uni Schedule → ICS. The app itself is index.html and needs no build; this file only drives the tests.",
+  "description": "Unisch. The app itself is index.html and needs no build; this file only drives the tests.",
   "scripts": {
     "test": "playwright test"
   },

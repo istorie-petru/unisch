@@ -1,6 +1,6 @@
 {
-  "name": "Uni Schedule → ICS",
-  "short_name": "Uni Schedule",
+  "name": "Unisch",
+  "short_name": "Unisch",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

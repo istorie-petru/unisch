@@ -2,11 +2,11 @@
   <img src="icons/icon-192.png" width="96" height="96" alt="">
 </p>
 
-<h1 align="center">unisch</h1>
+<h1 align="center">Unisch</h1>
 
 <p align="center">
   Turn your university timetable, odd and even weeks included, into a calendar file.<br>
-  <a href="https://istorie-petru.github.io/unisch/"><strong>Open unisch →</strong></a>
+  <a href="https://istorie-petru.github.io/unisch/"><strong>Open Unisch →</strong></a>
 </p>
 
 ![The Classes table](docs/table.png)

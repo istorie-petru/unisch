@@ -10,7 +10,7 @@ const EVEN_MON = course({ id: "even", parity: "even", start: "10:00", end: "12:0
 
 async function exportIcs(page, settings, holidays){
   await openWith(page, appState({ courses: [ODD_MON, EVEN_MON], holidays: holidays || [], settings: Object.assign({}, SEMESTER, settings) }));
-  return page.evaluate(()=> window.__uniSchedule.buildIcs());
+  return page.evaluate(()=> window.__unisch.buildIcs());
 }
 
 test("ISO mode follows the real ISO week number across a 53-week year", async ({ page })=>{
@@ -75,7 +75,7 @@ test("a holiday crossing New Year removes every class inside it, in every browse
 test("a holiday that ends before it starts blocks the export instead of being ignored", async ({ page })=>{
   const holidays = [{ id: "h", label: "Christmas", start: "2026-12-21", end: "2026-01-03" }];
   await openWith(page, appState({ courses: [ODD_MON], holidays, settings: SEMESTER }));
-  const err = await page.evaluate(()=>{ try{ window.__uniSchedule.buildIcs(); return ""; }catch(e){ return e.message; } });
+  const err = await page.evaluate(()=>{ try{ window.__unisch.buildIcs(); return ""; }catch(e){ return e.message; } });
   expect(err).toContain('"Christmas" ends before it starts (21.12.2026 – 03.01.2026)');
   await page.getByRole("button", { name: "Holidays" }).click();
   await expect(page.locator("#holidaysBody tr").first()).toHaveClass(/range-invalid/);
@@ -102,8 +102,8 @@ test("time zone setting pins times and embeds the zone's real DST transitions", 
   expect(vtz).toMatch(/BEGIN:STANDARD\r\nDTSTART:20261025T040000\r\nTZOFFSETFROM:\+0300\r\nTZOFFSETTO:\+0200/);
   // Occurrences are unchanged by the zone.
   expect(expandIcs(ics).odd).toEqual(expandIcs(await page.evaluate(()=>{
-    window.__uniSchedule.state.settings.timeZone = "";
-    return window.__uniSchedule.buildIcs();
+    window.__unisch.state.settings.timeZone = "";
+    return window.__unisch.buildIcs();
   })).odd);
 });
 

@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Uni Schedule → ICS</title>
+<title>Unisch</title>
 <!-- Relative paths so the icons resolve under a GitHub Pages project URL (/<repo>/) too. -->
 <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
-<meta name="apple-mobile-web-app-title" content="Uni Schedule">
+<meta name="apple-mobile-web-app-title" content="Unisch">
 <meta name="theme-color" content="#eff0f1">
 <style>
   :root{
@@ -700,6 +700,7 @@
     edit: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11.3 2.3a1.4 1.4 0 012 2L5 12.6l-3 .8.8-3z"/></svg>'
   };
 
+  // Legacy key names, kept on purpose: renaming them would lose saved data.
   const STORAGE_KEY = "uniScheduleIcs.v3";
   const THEME_KEY = "uniScheduleIcs.theme";
   const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
@@ -826,7 +827,7 @@
     savedSnapshot = undoStack.pop();
     state = normalizeState(JSON.parse(savedSnapshot));
     localStorage.setItem(STORAGE_KEY, savedSnapshot);
-    window.__uniSchedule.state = state;
+    window.__unisch.state = state;
     closeAddModal();
     renderAll();
     updateUndoButton();
@@ -2244,7 +2245,7 @@
     disarmWipe();
     Object.keys(localStorage).filter(k => k.startsWith("uniScheduleIcs.")).forEach(k => localStorage.removeItem(k));
     state = defaultState();
-    window.__uniSchedule.state = state;
+    window.__unisch.state = state;
     savedSnapshot = JSON.stringify(state);
     undoStack.length = 0;
     updateUndoButton();
@@ -2258,7 +2259,7 @@
   // ---------- Backup export/import ----------
   document.getElementById("btnExportJson").addEventListener("click", ()=>{
     const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
-    downloadBlob(blob, "uni-schedule-backup.json");
+    downloadBlob(blob, "unisch-backup.json");
     toast("Backup exported");
     moreMenu.classList.remove("open");
   });
@@ -2494,7 +2495,7 @@
     const lines = [];
     lines.push("BEGIN:VCALENDAR");
     lines.push("VERSION:2.0");
-    lines.push("PRODID:-//uni-schedule-ics//EN");
+    lines.push("PRODID:-//Unisch//EN");
     lines.push("CALSCALE:GREGORIAN");
     lines.push(`X-WR-CALNAME:${escapeIcsText(settings.calName || "University Schedule")}`);
     if(tz){
@@ -2540,6 +2541,8 @@
       const color = colorForType(course.type);
 
       lines.push("BEGIN:VEVENT");
+      // Legacy suffix, kept on purpose: calendar apps match re-imported events
+      // by UID, so changing it would duplicate every class instead of updating it.
       lines.push(`UID:${course.id}@uni-schedule-ics`);
       lines.push(`DTSTAMP:${dtstamp}`);
       lines.push(`DTSTART${local(firstW, course.start)}`);
@@ -2649,7 +2652,7 @@
   populateTimeZones();
   renderAll();
 
-  window.__uniSchedule = {
+  window.__unisch = {
     state, buildIcs, buildVcf, isoWeekNumber, isOddIsoWeek, colorForType,
     computeCreditsSummary, computeOverlaps, acronymFor, makeWeekParity,
     buildVtimezone, tzOffsetMinutes, normalizeState, undo
