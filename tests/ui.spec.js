@@ -336,12 +336,15 @@ test("odd/even split labels keep the normal font size and only abbreviate when n
       const odd = l.classList.contains("tl");
       const x = odd ? (r.right - wrap.left) / wrap.width : (wrap.right - r.left) / wrap.width;
       const y = odd ? (r.bottom - wrap.top) / wrap.height : (wrap.bottom - r.top) / wrap.height;
-      return { text: l.textContent, size: getComputedStyle(l).fontSize, inside: x + y <= 1 };
+      return { text: l.querySelector(".we-name").textContent, room: l.querySelector(".we-room")?.textContent,
+               size: getComputedStyle(l).fontSize, inside: x + y <= 1 };
     });
     return { normal, labels };
   });
   expect(info.labels.map(l => l.size)).toEqual([info.normal, info.normal]);
   // "Programare orientată pe obiecte" is too long for its triangle; "Baze de date" fits.
   expect(info.labels.map(l => l.text)).toEqual(["POO", "Baze de date"]);
+  // The room sits under each name, like in a regular block.
+  expect(info.labels.map(l => l.room)).toEqual(["C112", "C112"]);
   expect(info.labels.every(l => l.inside)).toBe(true);
 });

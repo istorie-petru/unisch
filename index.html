@@ -35,6 +35,19 @@
     --tag-teal-fg:#017272;   --tag-teal-bg:#e2f5f4;
     --tag-indigo-fg:#555f94; --tag-indigo-bg:#eceffe;
 
+    /* Vivid palette for per-class custom colors: -solid fills events, -fg/-bg tint dots and chips */
+    --tag-v-red-solid:#e5384f;    --tag-v-orange-solid:#f06a1d; --tag-v-amber-solid:#f7b51c; --tag-v-amber-on:#3b2a00;
+    --tag-v-green-solid:#13a874;  --tag-v-cyan-solid:#0a95d6;   --tag-v-blue-solid:#4361ee;
+    --tag-v-violet-solid:#8247e5; --tag-v-pink-solid:#e2448c;
+    --tag-v-red-fg:#d6243a;    --tag-v-red-bg:#ffdde1;
+    --tag-v-orange-fg:#e2580b; --tag-v-orange-bg:#ffe4cf;
+    --tag-v-amber-fg:#b77900;  --tag-v-amber-bg:#ffefb8;
+    --tag-v-green-fg:#0b9a63;  --tag-v-green-bg:#cdf5e2;
+    --tag-v-cyan-fg:#0786c2;   --tag-v-cyan-bg:#d2effd;
+    --tag-v-blue-fg:#2f4fd8;   --tag-v-blue-bg:#dde4ff;
+    --tag-v-violet-fg:#7433e0; --tag-v-violet-bg:#ebe0ff;
+    --tag-v-pink-fg:#d6337a;   --tag-v-pink-bg:#ffdcea;
+
     --font-system:"Noto Sans","Segoe UI",Cantarell,Ubuntu,Roboto,"Helvetica Neue",Arial,sans-serif;
     --text-caption:11px;--text-footnote:12px;--text-body:13px;--text-callout:13.5px;
     --text-headline:15px;--text-title3:16px;--text-title2:19px;
@@ -58,6 +71,14 @@
     --overlay-scrim:rgba(0,0,0,.55);
     --control-bg:#333335;--control-bg-hover:#3a3a3c;--control-border:rgba(255,255,255,.16);
     --accent-subtle:rgba(0,122,255,.22);--accent-subtle-strong:rgba(0,122,255,.32);
+    --tag-v-red-fg:#ff7a86;    --tag-v-red-bg:#4f1c24;
+    --tag-v-orange-fg:#ff9a52; --tag-v-orange-bg:#4d2814;
+    --tag-v-amber-fg:#ffcc45;  --tag-v-amber-bg:#463710;
+    --tag-v-green-fg:#3ddba0;  --tag-v-green-bg:#123f2e;
+    --tag-v-cyan-fg:#4cc6ff;   --tag-v-cyan-bg:#0f3a50;
+    --tag-v-blue-fg:#8199ff;   --tag-v-blue-bg:#1f2b5e;
+    --tag-v-violet-fg:#b28dff; --tag-v-violet-bg:#33215c;
+    --tag-v-pink-fg:#ff7fb2;   --tag-v-pink-bg:#4f1a33;
   }
 
   *{box-sizing:border-box;}
@@ -398,7 +419,8 @@
   /* Same size as other blocks' names; the max-width is set per block to the triangle's width at the label's row. */
   .we-tri-label{position:absolute; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .we-tri-label.tl{top:3px; left:6px;}
-  .we-tri-label.br{bottom:3px; right:6px;}
+  .we-tri-label.br{bottom:3px; right:6px; text-align:right;}
+  .we-tri-label .we-room{font-weight:400;}
 
   /* Modal */
   .modal-overlay{
@@ -419,6 +441,13 @@
   .modal-body{padding:16px; overflow-y:auto;}
   .field-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px 16px;}
   .field-wide{grid-column:span 2;}
+  .color-select{position:relative; display:flex;}
+  .color-select select{flex:1; padding-left:30px!important;}
+  .color-select .color-swatch{
+    position:absolute; left:10px; top:50%; width:12px; height:12px; margin-top:-6px; border-radius:4px;
+    pointer-events:none; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);
+  }
+  .color-select .color-swatch.auto{background:conic-gradient(var(--tag-v-red-solid),var(--tag-v-amber-solid),var(--tag-v-green-solid),var(--tag-v-blue-solid),var(--tag-v-violet-solid),var(--tag-v-red-solid));}
   .field-toggle{grid-column:span 2; flex-direction:row!important; align-items:center; gap:8px;}
   .field-toggle label{text-transform:none; font-weight:500; font-size:var(--text-body); color:var(--fg-primary);}
   .modal-footer{display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid var(--separator);}
@@ -659,13 +688,20 @@
           <label for="mCredits">Credits</label>
           <input type="number" id="mCredits" min="0" step="1" value="0">
         </div>
-        <div class="field field-wide">
+        <div class="field">
           <label for="mParity">Week</label>
           <select id="mParity">
             <option value="all">Every week</option>
             <option value="odd">Odd week</option>
             <option value="even">Even week</option>
           </select>
+        </div>
+        <div class="field">
+          <label for="mColor">Color</label>
+          <div class="color-select">
+            <span class="color-swatch auto" id="mColorSwatch"></span>
+            <select id="mColor"></select>
+          </div>
         </div>
         <div class="field field-toggle">
           <input type="checkbox" id="mEnrolled" checked>
@@ -719,6 +755,34 @@
     { key:"pink",   ics:"palevioletred" },
     { key:"red",    ics:"indianred" }
   ];
+  // Custom colors a class can be given; without one, blocks use the week color.
+  const CUSTOM_COLORS = [
+    { key:"v-red",    label:"Red",    ics:"crimson", solid:true },
+    { key:"v-orange", label:"Orange", ics:"orangered", solid:true },
+    { key:"v-amber",  label:"Amber",  ics:"orange", solid:true },
+    { key:"v-green",  label:"Green",  ics:"mediumseagreen", solid:true },
+    { key:"v-cyan",   label:"Cyan",   ics:"deepskyblue", solid:true },
+    { key:"v-blue",   label:"Blue",   ics:"royalblue", solid:true },
+    { key:"v-violet", label:"Violet", ics:"blueviolet", solid:true },
+    { key:"v-pink",   label:"Pink",   ics:"deeppink", solid:true }
+  ];
+  // Custom colors fill the whole event; type colors keep the soft tint.
+  function paintEvent(el, color){
+    if(color.solid){
+      el.style.background = `var(--tag-${color.key}-solid)`;
+      el.style.color = `var(--tag-${color.key}-on, #fff)`;
+    } else {
+      el.style.background = `var(--tag-${color.key}-bg)`;
+      el.style.color = `var(--tag-${color.key}-fg)`;
+    }
+  }
+  // Calendar blocks: a custom color if the class has one, else its week color.
+  function colorForEvent(course){
+    return CUSTOM_COLORS.find(c => c.key === course.color) || { key: colorForParity(course.parity) };
+  }
+  function colorForCourse(course){
+    return CUSTOM_COLORS.find(c => c.key === course.color) || colorForType(course.type);
+  }
   function colorForType(type){
     const str = (type || "untyped").trim().toLowerCase();
     if(!str) return PALETTE[0];
@@ -1376,7 +1440,7 @@
     const dot = document.createElement("span");
     dot.className = "type-dot";
     dot.style.marginRight = "0";
-    const color = colorForType(course.type);
+    const color = colorForCourse(course);
     dot.style.background = `var(--tag-${color.key}-fg)`;
     const span = document.createElement("span");
     span.className = "cell-text";
@@ -1435,6 +1499,19 @@
   const mRoom = document.getElementById("mRoom");
   const mCredits = document.getElementById("mCredits");
   const mEnrolled = document.getElementById("mEnrolled");
+  const mColor = document.getElementById("mColor");
+  const mColorSwatch = document.getElementById("mColorSwatch");
+  [{ key:"", label:"Auto (week color)" }].concat(CUSTOM_COLORS).forEach(c=>{
+    const o = document.createElement("option");
+    o.value = c.key;
+    o.textContent = c.label;
+    mColor.appendChild(o);
+  });
+  function syncColorSwatch(){
+    mColorSwatch.classList.toggle("auto", !mColor.value);
+    mColorSwatch.style.background = mColor.value ? `var(--tag-${mColor.value}-solid)` : "";
+  }
+  mColor.addEventListener("change", syncColorSwatch);
   const modalTitleEl = document.getElementById("modalTitle");
   const btnModalSave = document.getElementById("btnModalSave");
 
@@ -1458,6 +1535,8 @@
     mRoom.value = "";
     mCredits.value = "0";
     mEnrolled.checked = true;
+    mColor.value = "";
+    syncColorSwatch();
     modalOverlay.classList.add("is-open");
     setTimeout(()=> mName.focus(), 160);
   }
@@ -1478,6 +1557,8 @@
     mRoom.value = course.room || "";
     mCredits.value = course.credits !== undefined ? course.credits : 0;
     mEnrolled.checked = course.enrolled !== false;
+    mColor.value = CUSTOM_COLORS.some(c => c.key === course.color) ? course.color : "";
+    syncColorSwatch();
     modalOverlay.classList.add("is-open");
     setTimeout(()=> mName.focus(), 160);
   }
@@ -1520,7 +1601,7 @@
       name: mName.value.trim(), acronym: mAcronym.value.trim(), type: mType.value.trim(),
       professor: mProfessor.value.trim(), room: mRoom.value.trim(),
       credits: parseFloat(mCredits.value) || 0,
-      parity: mParity.value, enrolled: mEnrolled.checked
+      parity: mParity.value, enrolled: mEnrolled.checked, color: mColor.value
     };
     if(editingId){
       const course = state.courses.find(c=>c.id === editingId);
@@ -1806,15 +1887,14 @@
     const { startMin, endMin } = posFor(course, gridStart);
     if(endMin <= 0 || startMin >= totalHours*60) return;
     const { top, height } = pxTopHeight(startMin, endMin);
-    const colorKey = colorForParity(course.parity);
+    const color = colorForEvent(course);
     const gap = opts.widthPct === 100 ? 3 : 2;
     const ev = document.createElement("div");
     ev.className = "week-event" + (opts.conflict ? " conflict" : "");
     ev.style.left = `calc(${opts.leftPct}% + ${gap}px)`;
     ev.style.width = `calc(${opts.widthPct}% - ${2*gap}px)`;
     ev.style.top = top + "px"; ev.style.height = height + "px";
-    ev.style.background = `var(--tag-${colorKey}-bg)`;
-    ev.style.color = `var(--tag-${colorKey}-fg)`;
+    paintEvent(ev, color);
     const weeks = course.parity === "odd" || course.parity === "even" ? ` · ${course.parity} weeks` : "";
     // The color shows the week now, so the type goes in the tooltip.
     ev.title = `${opts.conflict ? "Conflict: " : ""}${course.name}${course.type ? " · " + course.type : ""}${course.room ? " · " + course.room : ""}${weeks}`;
@@ -1881,23 +1961,31 @@
     wrap.style.left = "3px"; wrap.style.right = "3px";
     wrap.style.top = top + "px"; wrap.style.height = height + "px";
     const typeOf = (c)=> c.type ? `, ${c.type}` : "";
-    wrap.title = `${odd.name}${typeOf(odd)} (odd week) / ${even.name}${typeOf(even)} (even week)`;
+    const roomOf = (c)=> c.room ? ` · ${c.room}` : "";
+    wrap.title = `${odd.name}${typeOf(odd)}${roomOf(odd)} (odd week) / ${even.name}${typeOf(even)}${roomOf(even)} (even week)`;
 
-    const kOdd = colorForParity("odd"), kEven = colorForParity("even");
-
-    const triOdd = document.createElement("div");
-    triOdd.className = "week-tri tri-a";
-    triOdd.style.background = `var(--tag-${kOdd}-bg)`;
-    triOdd.style.color = `var(--tag-${kOdd}-fg)`;
-    triOdd.innerHTML = `<span class="we-tri-label tl"></span>`;
-    setFitCandidates(triOdd.querySelector(".we-tri-label"), [odd.name || acronymFor(odd), acronymFor(odd)]);
-
-    const triEven = document.createElement("div");
-    triEven.className = "week-tri tri-b";
-    triEven.style.background = `var(--tag-${kEven}-bg)`;
-    triEven.style.color = `var(--tag-${kEven}-fg)`;
-    triEven.innerHTML = `<span class="we-tri-label br"></span>`;
-    setFitCandidates(triEven.querySelector(".we-tri-label"), [even.name || acronymFor(even), acronymFor(even)]);
+    // Same name-then-room stack as a regular block, anchored in the triangle's corner.
+    const makeTri = (course, triClass, corner)=>{
+      const tri = document.createElement("div");
+      tri.className = `week-tri ${triClass}`;
+      paintEvent(tri, colorForEvent(course));
+      const label = document.createElement("span");
+      label.className = `we-tri-label ${corner}`;
+      const nameEl = document.createElement("span");
+      nameEl.className = "we-name";
+      label.appendChild(nameEl);
+      if(course.room){
+        const r = document.createElement("span");
+        r.className = "we-room";
+        r.textContent = course.room;
+        label.appendChild(r);
+      }
+      tri.appendChild(label);
+      setFitCandidates(nameEl, [course.name || acronymFor(course), acronymFor(course)]);
+      return tri;
+    };
+    const triOdd = makeTri(odd, "tri-a", "tl");
+    const triEven = makeTri(even, "tri-b", "br");
 
     // Alternating odd/even pairs can't be dragged (moving one half cleanly
     // out of a diagonal split needs the modal) — double-click/tap a half to
@@ -1907,14 +1995,16 @@
       onPress(tri, { accept: ()=> true, tap, start: ()=> ({ move(){}, end(){} }) });
       makeFocusable(tri, `${parity} week: ${eventLabel(course)}`, ()=> openEditModal(course));
     });
-    // Each label sits on a row 3px in from its corner. The triangle is
-    // narrower the further that row is from the corner, so the label may be
-    // as wide as the triangle at the row's inner edge (minus the 6px inset
-    // and a 3px gap to the diagonal). Only a name wider than that falls back
-    // to the acronym.
-    const rowInner = 3 + 10.5 * 1.3;
-    const pct = Math.max(20, 100 * (1 - rowInner / height));
-    [triOdd, triEven].forEach(t=>{ t.querySelector(".we-tri-label").style.maxWidth = `calc(${pct.toFixed(1)}% - 9px)`; });
+    // Each label starts 3px in from its corner and is one row (name) or two
+    // (name + room) tall. The triangle is narrower the further a row is from
+    // the corner, so the label may be as wide as the triangle at its inner
+    // edge (minus the 6px inset and a 3px gap to the diagonal). Only a name
+    // wider than that falls back to the acronym.
+    [[triOdd, odd], [triEven, even]].forEach(([t, c])=>{
+      const rowInner = 3 + 10.5 * 1.3 * (c.room ? 2 : 1);
+      const pct = Math.max(20, 100 * (1 - rowInner / height));
+      t.querySelector(".we-tri-label").style.maxWidth = `calc(${pct.toFixed(1)}% - 9px)`;
+    });
     wrap.appendChild(triOdd);
     wrap.appendChild(triEven);
     col.appendChild(wrap);
@@ -2538,7 +2628,7 @@
       // UNTIL must be UTC when DTSTART has a TZID; the day after the last
       // occurrence at 23:59:59Z covers it in any zone and can't reach the next one.
       const until = tz ? `${fmtDate(addDays(lastW, 1))}T235959Z` : combineDateTime(lastW, course.end);
-      const color = colorForType(course.type);
+      const color = colorForCourse(course);
 
       lines.push("BEGIN:VEVENT");
       // Legacy suffix, kept on purpose: calendar apps match re-imported events
@@ -2653,7 +2743,7 @@
   renderAll();
 
   window.__unisch = {
-    state, buildIcs, buildVcf, isoWeekNumber, isOddIsoWeek, colorForType,
+    state, buildIcs, buildVcf, isoWeekNumber, isOddIsoWeek, colorForType, colorForCourse,
     computeCreditsSummary, computeOverlaps, acronymFor, makeWeekParity,
     buildVtimezone, tzOffsetMinutes, normalizeState, undo
   };
