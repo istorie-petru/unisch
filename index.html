@@ -309,9 +309,10 @@
   .tri-b{clip-path:polygon(100% 0,100% 100%,0 100%);}
   .we-corner-dot{position:absolute; width:5px; height:5px; border-radius:50%; top:3px; left:3px;}
   .we-corner-dot.br{top:auto; left:auto; bottom:3px; right:3px;}
-  .we-tri-label{position:absolute; font-size:9px; font-weight:700; white-space:nowrap;}
+  .we-tri-label{position:absolute; font-size:9px; line-height:1.25; white-space:nowrap; max-width:60%;}
   .we-tri-label.tl{top:3px; left:10px;}
-  .we-tri-label.br{bottom:3px; right:10px;}
+  .we-tri-label.br{bottom:3px; right:10px; text-align:right;}
+  .we-tri-label .we-name, .we-tri-label .we-room{overflow:hidden; text-overflow:ellipsis;}
 
   /* Modal */
   .modal-overlay{
@@ -1388,21 +1389,37 @@
     wrap.className = "week-event diagonal-wrap";
     wrap.style.left = "3px"; wrap.style.right = "3px";
     wrap.style.top = top + "px"; wrap.style.height = height + "px";
-    wrap.title = `${odd.name} (odd week) / ${even.name} (even week)`;
+    const withRoom = c => `${c.name}${c.room ? " · " + c.room : ""}`;
+    wrap.title = `${withRoom(odd)} (odd week) / ${withRoom(even)} (even week)`;
 
-    const cOdd = colorForType(odd.type), cEven = colorForType(even.type);
-
-    const triOdd = document.createElement("div");
-    triOdd.className = "week-tri tri-a";
-    triOdd.style.background = `var(--tag-${cOdd.key}-bg)`;
-    triOdd.style.color = `var(--tag-${cOdd.key}-fg)`;
-    triOdd.innerHTML = `<span class="we-corner-dot" style="background:var(--tag-orange-fg)"></span><span class="we-tri-label tl">${acronymFor(odd)}</span>`;
-
-    const triEven = document.createElement("div");
-    triEven.className = "week-tri tri-b";
-    triEven.style.background = `var(--tag-${cEven.key}-bg)`;
-    triEven.style.color = `var(--tag-${cEven.key}-fg)`;
-    triEven.innerHTML = `<span class="we-corner-dot br" style="background:var(--tag-green-fg)"></span><span class="we-tri-label br">${acronymFor(even)}</span>`;
+    // Same name-then-room stack as a regular cell, anchored in its triangle's corner.
+    const makeTri = (course, triClass, corner, dotColor) => {
+      const color = colorForType(course.type);
+      const tri = document.createElement("div");
+      tri.className = `week-tri ${triClass}`;
+      tri.style.background = `var(--tag-${color.key}-bg)`;
+      tri.style.color = `var(--tag-${color.key}-fg)`;
+      const dot = document.createElement("span");
+      dot.className = `we-corner-dot${corner === "br" ? " br" : ""}`;
+      dot.style.background = `var(--tag-${dotColor}-fg)`;
+      tri.appendChild(dot);
+      const label = document.createElement("span");
+      label.className = `we-tri-label ${corner}`;
+      const nameEl = document.createElement("span");
+      nameEl.className = "we-name";
+      nameEl.textContent = acronymFor(course);
+      label.appendChild(nameEl);
+      if(course.room){
+        const r = document.createElement("span");
+        r.className = "we-room";
+        r.textContent = course.room;
+        label.appendChild(r);
+      }
+      tri.appendChild(label);
+      return tri;
+    };
+    const triOdd = makeTri(odd, "tri-a", "tl", "orange");
+    const triEven = makeTri(even, "tri-b", "br", "green");
 
     // Alternating odd/even pairs stay display-only here (moving one half
     // cleanly out of a diagonal split needs the modal, not a drag) — edit
